@@ -1,13 +1,29 @@
-import { Project, Task } from './types';
+import { Project, Task, UserAccount } from './types';
 
-export const INITIAL_USER = {
-  name: 'Kevin Safrisal',
-  initials: 'KS',
-  email: 'karashii866@gmail.com',
-  avatarColor: '#d84b7f',
-  workspace: 'My workspace',
-  trialDaysLeft: 14,
-};
+export const INITIAL_USERS: UserAccount[] = [
+  {
+    id: 'user-kevin',
+    name: 'Kevin Safrisal',
+    email: 'karashii866@gmail.com',
+    password: 'password123',
+    initials: 'KS',
+    avatarColor: '#d84b7f',
+    workspace: 'My workspace',
+    role: 'Owner',
+  },
+  {
+    id: 'user-friend',
+    name: 'Alex Teammate',
+    email: 'friend@kizuna.pm',
+    password: 'password123',
+    initials: 'AT',
+    avatarColor: '#4573d2',
+    workspace: 'My workspace',
+    role: 'Member',
+  },
+];
+
+export const INITIAL_USER = INITIAL_USERS[0];
 
 export const INITIAL_PROJECTS: Project[] = [
   {
@@ -20,6 +36,11 @@ export const INITIAL_PROJECTS: Project[] = [
         name: 'Kevin Safrisal',
         initials: 'KS',
         avatarColor: '#d84b7f',
+      },
+      {
+        name: 'Alex Teammate',
+        initials: 'AT',
+        avatarColor: '#4573d2',
       },
     ],
     portfolios: [],
@@ -95,18 +116,26 @@ export const INITIAL_TASKS: Task[] = [
     projectId: 'kevins-first-project',
     projectName: "Kevin's first project",
     assignee: {
-      name: 'Unassigned',
-      initials: '',
-      isPlaceholder: true,
+      name: 'Alex Teammate',
+      initials: 'AT',
+      avatarColor: '#4573d2',
     },
     dueDate: 'Nov 4 – 6',
     priority: 'High',
     status: 'Off track',
     visibility: 'My workspace',
-    description: 'Verify deployment to Vercel and check responsiveness across desktop screen resolutions.',
+    description: 'Collaborate with Kevin on UI review and verify multi-user authorization.',
     subtasks: [],
     attachments: [],
-    comments: [],
+    comments: [
+      {
+        id: 'c-2',
+        author: 'Alex Teammate',
+        initials: 'AT',
+        text: 'Ready to collaborate on this task!',
+        createdAt: 'Today at 10:15 AM',
+      },
+    ],
     createdAt: '2026-11-02T01:15:00.000Z',
   },
 ];

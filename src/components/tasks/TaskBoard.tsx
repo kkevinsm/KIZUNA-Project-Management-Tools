@@ -245,3 +245,4 @@ export default function TaskBoard({ sections, tasks, projectId }: TaskBoardProps
     </div>
   );
 }
+

@@ -14,6 +14,8 @@ export default function CreateModal() {
     createTask,
     createProject,
     projects,
+    users,
+    currentUser,
   } = useApp();
 
   const router = useRouter();
@@ -24,6 +26,7 @@ export default function CreateModal() {
   const [taskName, setTaskName] = useState('');
   const [taskProject, setTaskProject] = useState('kevins-first-project');
   const [taskSection, setTaskSection] = useState('To do');
+  const [taskAssignee, setTaskAssignee] = useState(currentUser.name);
   const [taskDueDate, setTaskDueDate] = useState('Today – Nov 4');
   const [taskPriority, setTaskPriority] = useState<PriorityLevel>('Low');
   const [taskStatus, setTaskStatus] = useState<StatusLevel>('On track');
@@ -39,10 +42,17 @@ export default function CreateModal() {
     e.preventDefault();
     if (!taskName.trim()) return;
 
+    const selectedUser = users.find((u) => u.name === taskAssignee) || currentUser;
+
     createTask({
       name: taskName,
       projectId: taskProject,
       section: taskSection,
+      assignee: {
+        name: selectedUser.name,
+        initials: selectedUser.initials,
+        avatarColor: selectedUser.avatarColor,
+      },
       dueDate: taskDueDate,
       priority: taskPriority,
       status: taskStatus,
@@ -156,7 +166,24 @@ export default function CreateModal() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[#8a8886] font-semibold mb-1.5">
+                  Assignee
+                </label>
+                <select
+                  value={taskAssignee}
+                  onChange={(e) => setTaskAssignee(e.target.value)}
+                  className="w-full bg-[#252628] text-white px-2.5 py-2 rounded-lg border border-[#37383b] outline-none text-[12px]"
+                >
+                  {users.map((u) => (
+                    <option key={u.id} value={u.name}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-[#8a8886] font-semibold mb-1.5">
                   Due Date
@@ -169,7 +196,9 @@ export default function CreateModal() {
                   className="w-full bg-[#252628] text-white px-3 py-2 rounded-lg border border-[#37383b] focus:border-[#4573d2] outline-none"
                 />
               </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[#8a8886] font-semibold mb-1.5">
                   Priority
@@ -281,3 +310,4 @@ export default function CreateModal() {
     </div>
   );
 }
+

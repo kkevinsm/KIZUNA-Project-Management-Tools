@@ -46,7 +46,7 @@ export default function HomePage() {
             Monday, November 2
           </div>
           <h1 className="text-[28px] font-bold text-white tracking-tight mt-0.5">
-            Good morning, Kevin
+            Good morning, {currentUser.name.split(' ')[0]}
           </h1>
         </div>
 
@@ -342,3 +342,4 @@ export default function HomePage() {
     </div>
   );
 }
+

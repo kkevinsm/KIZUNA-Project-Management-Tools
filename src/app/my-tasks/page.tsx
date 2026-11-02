@@ -183,10 +183,12 @@ export default function MyTasksPage() {
             <div className="pb-12">
               {sections.map((sectionName) => {
                 const isCollapsed = collapsedSections[sectionName];
-                // In Asana screenshot, Task 2 & Task 1 are under "Recently assigned"
+                const userTasks = tasks.filter(
+                  (t) => t.assignee.name === currentUser.name
+                );
                 const sectionTasks =
                   sectionName === 'Recently assigned'
-                    ? tasks
+                    ? (userTasks.length > 0 ? userTasks : tasks)
                     : [];
 
                 return (
@@ -285,3 +287,4 @@ export default function MyTasksPage() {
     </div>
   );
 }
+

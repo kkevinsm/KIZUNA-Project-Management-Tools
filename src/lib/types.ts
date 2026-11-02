@@ -1,6 +1,17 @@
 export type PriorityLevel = 'Low' | 'Medium' | 'High';
 export type StatusLevel = 'On track' | 'At risk' | 'Off track';
 
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  initials: string;
+  avatarColor: string;
+  workspace: string;
+  role?: string;
+}
+
 export interface Assignee {
   name: string;
   initials: string;

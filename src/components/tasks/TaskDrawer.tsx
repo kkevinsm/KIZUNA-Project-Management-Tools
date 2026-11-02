@@ -29,6 +29,7 @@ export default function TaskDrawer() {
     toggleSubtask,
     addAttachment,
     removeAttachment,
+    users,
   } = useApp();
 
   const [commentText, setCommentText] = useState('');
@@ -170,21 +171,43 @@ export default function TaskDrawer() {
           <div className="text-[#8a8886]">Assignee</div>
           <div className="flex items-center gap-2">
             <div
-              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-semibold"
+              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0"
               style={{ backgroundColor: activeTask.assignee.avatarColor || '#d84b7f' }}
             >
               {activeTask.assignee.initials || 'KS'}
             </div>
-            <input
-              type="text"
+            <select
               value={activeTask.assignee.name}
-              onChange={(e) =>
-                updateTask(activeTask.id, {
-                  assignee: { ...activeTask.assignee, name: e.target.value },
-                })
-              }
-              className="bg-transparent hover:bg-[#28292c] text-[#f5f4f3] rounded px-2 py-0.5 outline-none border border-transparent focus:border-[#4573d2]"
-            />
+              onChange={(e) => {
+                const selectedUser = users.find((u) => u.name === e.target.value);
+                if (selectedUser) {
+                  updateTask(activeTask.id, {
+                    assignee: {
+                      name: selectedUser.name,
+                      initials: selectedUser.initials,
+                      avatarColor: selectedUser.avatarColor,
+                      isPlaceholder: false,
+                    },
+                  });
+                } else {
+                  updateTask(activeTask.id, {
+                    assignee: {
+                      name: 'Unassigned',
+                      initials: '',
+                      isPlaceholder: true,
+                    },
+                  });
+                }
+              }}
+              className="bg-[#252628] hover:bg-[#2e3034] text-[#f5f4f3] rounded px-2.5 py-1 text-[13px] outline-none border border-[#37383b] focus:border-[#4573d2]"
+            >
+              {users.map((u) => (
+                <option key={u.id} value={u.name}>
+                  {u.name} ({u.email})
+                </option>
+              ))}
+              <option value="Unassigned">Unassigned</option>
+            </select>
           </div>
 
           {/* Due date */}
@@ -473,3 +496,4 @@ export default function TaskDrawer() {
     </div>
   );
 }
+
