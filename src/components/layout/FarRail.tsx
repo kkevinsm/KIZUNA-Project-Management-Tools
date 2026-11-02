@@ -20,11 +20,8 @@ import { useApp } from '@/context/AppContext';
 
 export default function FarRail() {
   const router = useRouter();
-  const { currentUser, users, switchUser, logout, inviteUser } = useApp();
+  const { currentUser, users, switchUser, logout, openInviteModal } = useApp();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteName, setInviteName] = useState('');
-  const [showInviteModal, setShowInviteModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close menu on click outside
@@ -43,16 +40,6 @@ export default function FarRail() {
   const handleLogout = () => {
     logout();
     router.push('/login');
-  };
-
-  const handleSendInvite = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteName.trim() || !inviteEmail.trim()) return;
-    inviteUser(inviteName.trim(), inviteEmail.trim());
-    alert(`Teammate invited: ${inviteName} (${inviteEmail}). They can now log in!`);
-    setInviteName('');
-    setInviteEmail('');
-    setShowInviteModal(false);
   };
 
   const railItems = [
@@ -178,7 +165,7 @@ export default function FarRail() {
               <button
                 onClick={() => {
                   setIsMenuOpen(false);
-                  setShowInviteModal(true);
+                  openInviteModal();
                 }}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[#bdbbb9] hover:text-white hover:bg-[#2b2c2e] transition-colors text-[12px]"
               >
@@ -197,60 +184,6 @@ export default function FarRail() {
           </div>
         )}
       </div>
-
-      {/* Invite Modal */}
-      {showInviteModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#252628] border border-[#37383b] rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <h2 className="text-[18px] font-bold text-white mb-1.5">Invite a teammate</h2>
-            <p className="text-[13px] text-[#8a8886] mb-4">
-              Add your friend to your workspace so they can collaborate on tasks.
-            </p>
-
-            <form onSubmit={handleSendInvite} className="space-y-3.5 text-[13px]">
-              <div>
-                <label className="block text-[#8a8886] font-semibold mb-1">Teammate name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Alex"
-                  value={inviteName}
-                  onChange={(e) => setInviteName(e.target.value)}
-                  className="w-full bg-[#1e1f21] text-white px-3 py-2 rounded-lg border border-[#37383b] focus:border-[#4573d2] outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[#8a8886] font-semibold mb-1">Teammate email</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="alex@example.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  className="w-full bg-[#1e1f21] text-white px-3 py-2 rounded-lg border border-[#37383b] focus:border-[#4573d2] outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowInviteModal(false)}
-                  className="px-3.5 py-1.5 text-[#8a8886] hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-[#4573d2] hover:bg-[#3562be] text-white px-4 py-1.5 rounded-lg font-medium"
-                >
-                  Add Teammate
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </aside>
   );
 }

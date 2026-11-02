@@ -26,12 +26,16 @@ interface AppContextType {
   isCreateModalOpen: boolean;
   createModalType: 'task' | 'project';
   isSidebarCollapsed: boolean;
+  isInviteModalOpen: boolean;
+  openInviteModal: () => void;
+  closeInviteModal: () => void;
   login: (email: string, password?: string) => { success: boolean; error?: string };
   loginWithGoogle: (customGoogleAccount?: { name: string; email: string; picture?: string }) => { success: boolean };
   signup: (name: string, email: string, password?: string) => { success: boolean; error?: string };
   logout: () => void;
   switchUser: (userId: string) => void;
   inviteUser: (name: string, email: string) => UserAccount;
+  inviteTeammates: (emails: string[], projectIds?: string[]) => { addedCount: number; existingCount: number };
   setSearchQuery: (query: string) => void;
   openTaskDrawer: (taskId: string) => void;
   closeTaskDrawer: () => void;
@@ -90,6 +94,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalType, setCreateModalType] = useState<'task' | 'project'>('task');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Sync snapshot to Cloudflare R2
@@ -307,6 +312,74 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return newUser;
   };
 
+  const openInviteModal = () => setIsInviteModalOpen(true);
+  const closeInviteModal = () => setIsInviteModalOpen(false);
+
+  const inviteTeammates = (emails: string[], projectIds?: string[]) => {
+    let addedCount = 0;
+    let existingCount = 0;
+    const newUsersList = [...users];
+    const newlyAddedUsers: UserAccount[] = [];
+
+    emails.forEach((rawEmail) => {
+      const cleanEmail = rawEmail.trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.includes('@')) return;
+
+      const existing = newUsersList.find((u) => u.email.toLowerCase() === cleanEmail);
+      if (existing) {
+        existingCount++;
+        return;
+      }
+
+      const emailPrefix = cleanEmail.split('@')[0];
+      const displayName = emailPrefix
+        .replace(/[._-]+/g, ' ')
+        .split(' ')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+
+      const color = AVATAR_COLORS[newUsersList.length % AVATAR_COLORS.length];
+      const newUser: UserAccount = {
+        id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: displayName || 'Teammate',
+        email: cleanEmail,
+        password: 'password123',
+        initials: getInitials(displayName || 'TM'),
+        avatarColor: color,
+        workspace: 'My workspace',
+        role: 'Member',
+      };
+
+      newUsersList.push(newUser);
+      newlyAddedUsers.push(newUser);
+      addedCount++;
+    });
+
+    if (addedCount > 0) {
+      setUsers(newUsersList);
+
+      // Add to selected projects (or all projects if not specified)
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (!projectIds || projectIds.length === 0 || projectIds.includes(p.id)) {
+            const usersToAdd = newlyAddedUsers.map((u) => ({
+              name: u.name,
+              initials: u.initials,
+              avatarColor: u.avatarColor,
+            }));
+            return {
+              ...p,
+              members: [...p.members, ...usersToAdd],
+            };
+          }
+          return p;
+        })
+      );
+    }
+
+    return { addedCount, existingCount };
+  };
+
   const toggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
 
   const openTaskDrawer = (taskId: string) => {
@@ -504,6 +577,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isCreateModalOpen,
         createModalType,
         isSidebarCollapsed,
+        isInviteModalOpen,
+        openInviteModal,
+        closeInviteModal,
+        inviteTeammates,
         login,
         loginWithGoogle,
         signup,

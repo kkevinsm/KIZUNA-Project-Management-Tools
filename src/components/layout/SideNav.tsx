@@ -17,7 +17,7 @@ import { useApp } from '@/context/AppContext';
 
 export default function SideNav() {
   const pathname = usePathname();
-  const { projects, openCreateModal, isSidebarCollapsed } = useApp();
+  const { projects, openCreateModal, isSidebarCollapsed, openInviteModal } = useApp();
 
   if (isSidebarCollapsed) {
     return null;
@@ -108,58 +108,13 @@ export default function SideNav() {
         </div>
       </div>
 
-      {/* Bottom Section: Trial Card & Invite */}
-      <div className="pt-3 border-t border-[#2b2c2e] flex flex-col gap-2.5">
-        {/* Trial Card */}
-        <div className="bg-[#252628] rounded-xl p-3 border border-[#333538] flex flex-col gap-2.5">
-          <div className="flex items-center gap-2.5">
-            {/* Donut progress ring */}
-            <div className="relative w-7 h-7 flex items-center justify-center">
-              <svg className="w-7 h-7 transform -rotate-90">
-                <circle
-                  cx="14"
-                  cy="14"
-                  r="11"
-                  stroke="#2b3b32"
-                  strokeWidth="2.5"
-                  fill="transparent"
-                />
-                <circle
-                  cx="14"
-                  cy="14"
-                  r="11"
-                  stroke="#38b273"
-                  strokeWidth="2.5"
-                  fill="transparent"
-                  strokeDasharray="69"
-                  strokeDashoffset="18"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[12px] font-semibold text-white leading-tight">
-                Advanced trial
-              </span>
-              <span className="text-[11px] text-[#9c9a99]">14 days left</span>
-            </div>
-          </div>
-
-          {/* Yellow Billing Info Button */}
-          <button
-            onClick={() => alert("Billing details: Advanced Trial active.")}
-            className="w-full bg-[#f5b324] hover:bg-[#e2a41d] text-[#1e1f21] font-semibold text-[12px] py-1.5 px-3 rounded-lg text-center transition-colors shadow-sm"
-          >
-            Add billing info
-          </button>
-        </div>
-
-        {/* Invite link */}
+      {/* Bottom Section: Clean Invite Teammate */}
+      <div className="pt-3 border-t border-[#2b2c2e]">
         <button
-          onClick={() => alert("Invite link copied to clipboard: https://kizuna.pm/invite/kevin")}
-          className="flex items-center justify-center gap-2 py-1.5 text-[#bdbbb9] hover:text-white hover:bg-[#252628] rounded-lg transition-colors text-[12px]"
+          onClick={openInviteModal}
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 text-[#c5c3c0] hover:text-white hover:bg-[#28292c] rounded-lg transition-colors text-[13px] font-medium border border-[#333538] hover:border-[#44464a]"
         >
-          <UserPlus className="w-3.5 h-3.5" />
+          <UserPlus className="w-4 h-4 text-[#a2a09e]" />
           <span>Invite</span>
         </button>
       </div>
