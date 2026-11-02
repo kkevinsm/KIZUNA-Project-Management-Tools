@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   Task,
   Project,
@@ -27,6 +27,7 @@ interface AppContextType {
   createModalType: 'task' | 'project';
   isSidebarCollapsed: boolean;
   login: (email: string, password?: string) => { success: boolean; error?: string };
+  loginWithGoogle: (customGoogleAccount?: { name: string; email: string }) => { success: boolean };
   signup: (name: string, email: string, password?: string) => { success: boolean; error?: string };
   logout: () => void;
   switchUser: (userId: string) => void;
@@ -91,7 +92,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Restore state from localStorage on mount
+  // Sync snapshot to Cloudflare R2
+  const syncToCloudflareR2 = useCallback(async (type: 'users' | 'tasks' | 'projects', data: unknown) => {
+    try {
+      await fetch('/api/storage?action=save_db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, data }),
+      });
+    } catch {
+      // offline or silent
+    }
+  }, []);
+
+  // Restore state from localStorage on mount & clean up mock Alex account
   useEffect(() => {
     try {
       const savedUsers = localStorage.getItem('kizuna_users');
@@ -103,27 +117,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       let parsedUsers = INITIAL_USERS;
       if (savedUsers) {
         parsedUsers = JSON.parse(savedUsers);
+        // Clean out any legacy mock Alex Teammate accounts
+        parsedUsers = parsedUsers.filter(
+          (u: UserAccount) => u.id !== 'user-friend' && !u.name.toLowerCase().includes('alex teammate')
+        );
+        if (parsedUsers.length === 0) parsedUsers = INITIAL_USERS;
         setUsers(parsedUsers);
       }
 
       if (savedCurrentUserId) {
         const found = parsedUsers.find((u) => u.id === savedCurrentUserId);
         if (found) setCurrentUser(found);
+        else setCurrentUser(parsedUsers[0]);
       }
 
       if (savedAuth !== null) {
         setIsAuthenticated(savedAuth === 'true');
       }
 
-      if (savedTasks) setTasks(JSON.parse(savedTasks));
-      if (savedProjects) setProjects(JSON.parse(savedProjects));
+      if (savedTasks) {
+        let parsedTasks: Task[] = JSON.parse(savedTasks);
+        // Clean out Alex assignments
+        parsedTasks = parsedTasks.map((t) => {
+          if (t.assignee?.name?.toLowerCase().includes('alex teammate')) {
+            return { ...t, assignee: { name: 'Unassigned', initials: '', isPlaceholder: true } };
+          }
+          return t;
+        });
+        setTasks(parsedTasks);
+      }
+
+      if (savedProjects) {
+        let parsedProjects: Project[] = JSON.parse(savedProjects);
+        parsedProjects = parsedProjects.map((p) => ({
+          ...p,
+          members: p.members.filter((m) => !m.name.toLowerCase().includes('alex teammate')),
+        }));
+        setProjects(parsedProjects);
+      }
     } catch {
-      // Fallback to default
+      // Fallback
     }
     setIsHydrated(true);
   }, []);
 
-  // Save changes to localStorage
+  // Save changes to localStorage and sync to Cloudflare R2
   useEffect(() => {
     if (!isHydrated) return;
     try {
@@ -132,10 +170,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('kizuna_is_auth', String(isAuthenticated));
       localStorage.setItem('kizuna_tasks', JSON.stringify(tasks));
       localStorage.setItem('kizuna_projects', JSON.stringify(projects));
+
+      // Cloudflare R2 Database Sync
+      syncToCloudflareR2('users', users);
+      syncToCloudflareR2('tasks', tasks);
+      syncToCloudflareR2('projects', projects);
     } catch {
       // ignore
     }
-  }, [users, currentUser, isAuthenticated, tasks, projects, isHydrated]);
+  }, [users, currentUser, isAuthenticated, tasks, projects, isHydrated, syncToCloudflareR2]);
 
   const activeTask = tasks.find((t) => t.id === activeTaskId) || null;
 
@@ -152,6 +195,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     setCurrentUser(existing);
+    setIsAuthenticated(true);
+    return { success: true };
+  };
+
+  const loginWithGoogle = (customGoogleAccount?: { name: string; email: string }) => {
+    // If specific account provided, use or register it; otherwise default to Kevin's Google account
+    const email = customGoogleAccount?.email?.trim().toLowerCase() || 'karashii866@gmail.com';
+    const name = customGoogleAccount?.name?.trim() || 'Kevin Safrisal';
+
+    let user = users.find((u) => u.email.toLowerCase() === email);
+    if (!user) {
+      const color = AVATAR_COLORS[users.length % AVATAR_COLORS.length];
+      user = {
+        id: `user-google-${Date.now()}`,
+        name,
+        email,
+        initials: getInitials(name),
+        avatarColor: color,
+        workspace: 'My workspace',
+        role: 'Member',
+      };
+      setUsers((prev) => [...prev, user!]);
+    }
+
+    setCurrentUser(user);
     setIsAuthenticated(true);
     return { success: true };
   };
@@ -432,6 +500,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createModalType,
         isSidebarCollapsed,
         login,
+        loginWithGoogle,
         signup,
         logout,
         switchUser,

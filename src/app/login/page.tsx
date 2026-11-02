@@ -4,11 +4,11 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
-import { ArrowRight, AlertCircle, UserCheck } from 'lucide-react';
+import { ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, users, switchUser } = useApp();
+  const { login, loginWithGoogle } = useApp();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,12 +26,12 @@ export default function LoginPage() {
     if (result.success) {
       router.push('/');
     } else {
-      setError(result.error || 'Login failed');
+      setError(result.error || 'Login failed. Please check your credentials.');
     }
   };
 
-  const handleQuickLogin = (userId: string) => {
-    switchUser(userId);
+  const handleGoogleSignIn = () => {
+    loginWithGoogle();
     router.push('/');
   };
 
@@ -60,39 +60,10 @@ export default function LoginPage() {
       {/* Main Login Card */}
       <div className="max-w-md w-full mx-auto my-auto bg-[#252628] border border-[#333538] rounded-2xl p-8 shadow-2xl">
         <div className="text-center mb-6">
-          <h1 className="text-[26px] font-bold text-white tracking-tight">Welcome back</h1>
+          <h1 className="text-[26px] font-bold text-white tracking-tight">Welcome to Kizuna</h1>
           <p className="text-[13px] text-[#8a8886] mt-1.5">
-            Log in to collaborate with your team on Kizuna
+            Log in to manage projects and collaborate with your team
           </p>
-        </div>
-
-        {/* Quick One-Click Sign-in for Kevin and Friend */}
-        <div className="mb-6 p-3 bg-[#1e1f21] border border-[#333538] rounded-xl space-y-2">
-          <div className="text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider flex items-center gap-1.5">
-            <UserCheck className="w-3.5 h-3.5 text-[#4cd195]" />
-            <span>Quick Sign-in (1-Click)</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {users.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => handleQuickLogin(u.id)}
-                className="flex items-center gap-2 p-2 rounded-lg bg-[#252628] hover:bg-[#2e3034] border border-[#37383b] transition-colors text-left"
-              >
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                  style={{ backgroundColor: u.avatarColor }}
-                >
-                  {u.initials}
-                </div>
-                <div className="truncate">
-                  <div className="text-[12px] font-semibold text-white truncate">{u.name}</div>
-                  <div className="text-[10px] text-[#8a8886] truncate">{u.email}</div>
-                </div>
-              </button>
-            ))}
-          </div>
         </div>
 
         {error && (
@@ -102,7 +73,44 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Standard Form with Modern Web Guidance autocomplete & semantic attributes */}
+        {/* 1. Continue with Google Button */}
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          className="w-full bg-[#1e1f21] hover:bg-[#2b2c30] text-white border border-[#37383b] hover:border-[#4f5156] font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-3 transition-all shadow-sm active:scale-[0.99] mb-4 text-[13px]"
+        >
+          {/* Official Google G Logo SVG */}
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <path
+              fill="#4285F4"
+              d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.13C3.26 21.36 7.33 24 12 24z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.57H1.26C.46 8.17 0 9.99 0 12s.46 3.83 1.26 5.43l4.02-3.14z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.26 6.57l4.02 3.14c.95-2.83 3.6-4.96 6.72-4.96z"
+            />
+          </svg>
+          <span>Continue with Google</span>
+        </button>
+
+        {/* Divider */}
+        <div className="relative flex items-center justify-center my-4">
+          <div className="border-t border-[#37383b] w-full"></div>
+          <span className="bg-[#252628] px-3 text-[12px] text-[#8a8886] uppercase font-semibold">
+            or
+          </span>
+          <div className="border-t border-[#37383b] w-full"></div>
+        </div>
+
+        {/* Standard Email & Password Form */}
         <form onSubmit={handleSubmit} className="space-y-4 text-[13px]">
           <div>
             <label htmlFor="email" className="block text-[#8a8886] font-semibold mb-1.5">
@@ -153,7 +161,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-[#4573d2] hover:bg-[#3562be] disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 mt-2"
           >
-            <span>{loading ? 'Signing in...' : 'Sign In'}</span>
+            <span>{loading ? 'Signing in...' : 'Sign In with Email'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>

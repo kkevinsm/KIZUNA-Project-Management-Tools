@@ -16,6 +16,47 @@ const mockFileStore = new Map<string, MockFile>();
 
 export async function POST(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const action = searchParams.get('action');
+
+    // 1. Save Database snapshot to Cloudflare R2
+    if (action === 'save_db') {
+      const body = await req.json();
+      const { type, data } = body; // type: 'users' | 'tasks' | 'projects'
+      if (!type || !data) {
+        return NextResponse.json({ error: 'Missing type or data' }, { status: 400 });
+      }
+
+      const jsonString = JSON.stringify(data, null, 2);
+      const buffer = Buffer.from(jsonString, 'utf-8');
+      const key = `kizuna/database/${type}.json`;
+
+      if (isR2Configured()) {
+        try {
+          await uploadToR2({
+            key,
+            buffer,
+            contentType: 'application/json',
+          });
+          return NextResponse.json({ success: true, isR2: true, key });
+        } catch (err: unknown) {
+          console.error('R2 DB Save Error:', err);
+        }
+      }
+
+      // Fallback
+      mockFileStore.set(key, {
+        key,
+        name: `${type}.json`,
+        size: buffer.length,
+        type: 'application/json',
+        data: buffer.toString('base64'),
+        uploadedAt: new Date().toISOString(),
+      });
+      return NextResponse.json({ success: true, isR2: false, key });
+    }
+
+    // 2. Standard File Upload to Cloudflare R2
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const taskId = (formData.get('taskId') as string) || 'general';
@@ -84,6 +125,37 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get('key');
   const action = searchParams.get('action');
+  const type = searchParams.get('type');
+
+  // Load database snapshot from Cloudflare R2
+  if (action === 'load_db') {
+    const dbKey = `kizuna/database/${type}.json`;
+    if (isR2Configured()) {
+      try {
+        const client = getR2Client();
+        const bucket = process.env.CLOUDFLARE_R2_BUCKET_NAME!;
+        const command = new GetObjectCommand({
+          Bucket: bucket,
+          Key: dbKey,
+        });
+        const response = await client.send(command);
+        const str = await response.Body?.transformToString('utf-8');
+        if (str) {
+          return NextResponse.json({ success: true, isR2: true, data: JSON.parse(str) });
+        }
+      } catch {
+        // Not yet saved in R2, return null
+      }
+    }
+
+    const found = mockFileStore.get(dbKey);
+    if (found) {
+      const decoded = Buffer.from(found.data, 'base64').toString('utf-8');
+      return NextResponse.json({ success: true, isR2: false, data: JSON.parse(decoded) });
+    }
+
+    return NextResponse.json({ success: false, data: null });
+  }
 
   if (action === 'list') {
     if (isR2Configured()) {
@@ -168,4 +240,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
-

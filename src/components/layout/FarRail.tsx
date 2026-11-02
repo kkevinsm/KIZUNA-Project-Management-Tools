@@ -136,40 +136,42 @@ export default function FarRail() {
               </div>
             </div>
 
-            {/* Switch User section */}
-            <div className="space-y-1 mb-2">
-              <div className="text-[10px] font-semibold text-[#8a8886] uppercase px-2 mb-1">
-                Switch Teammate
-              </div>
-              {users.map((u) => {
-                const isSelected = u.id === currentUser.id;
-                return (
-                  <button
-                    key={u.id}
-                    onClick={() => {
-                      switchUser(u.id);
-                      setIsMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors text-left ${
-                      isSelected
-                        ? 'bg-[#2f3135] text-white font-medium'
-                        : 'text-[#bdbbb9] hover:bg-[#2b2c2e] hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                        style={{ backgroundColor: u.avatarColor }}
-                      >
-                        {u.initials}
+            {/* Switch User section (only shown if there are multiple accounts) */}
+            {users.length > 1 && (
+              <div className="space-y-1 mb-2">
+                <div className="text-[10px] font-semibold text-[#8a8886] uppercase px-2 mb-1">
+                  Switch Teammate
+                </div>
+                {users.map((u) => {
+                  const isSelected = u.id === currentUser.id;
+                  return (
+                    <button
+                      key={u.id}
+                      onClick={() => {
+                        switchUser(u.id);
+                        setIsMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors text-left ${
+                        isSelected
+                          ? 'bg-[#2f3135] text-white font-medium'
+                          : 'text-[#bdbbb9] hover:bg-[#2b2c2e] hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                          style={{ backgroundColor: u.avatarColor }}
+                        >
+                          {u.initials}
+                        </div>
+                        <span className="truncate text-[12px]">{u.name}</span>
                       </div>
-                      <span className="truncate text-[12px]">{u.name}</span>
-                    </div>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-[#4cd195]" />}
-                  </button>
-                );
-              })}
-            </div>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-[#4cd195]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Actions: Add friend & Logout */}
             <div className="pt-2 border-t border-[#333538] space-y-1">
