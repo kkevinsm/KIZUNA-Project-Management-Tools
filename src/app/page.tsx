@@ -14,6 +14,8 @@ import {
   ArrowRight,
   BookOpen,
   Calendar,
+  User,
+  X,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
@@ -21,13 +23,75 @@ export default function HomePage() {
   const {
     tasks,
     projects,
+    users,
     currentUser,
     openTaskDrawer,
     toggleTaskComplete,
     openCreateModal,
+    openInviteModal,
   } = useApp();
 
   const [taskFilter, setTaskFilter] = useState<'Upcoming' | 'Overdue' | 'Completed'>('Upcoming');
+  const [showDragArea, setShowDragArea] = useState(true);
+
+  // Initial delegated tasks matching Asana screenshot
+  const [assignedTasks, setAssignedTasks] = useState([
+    {
+      id: 'assigned-1',
+      name: 'Define project milestones',
+      dueDate: 'Yesterday',
+      dateColor: 'text-[#ff6b72]',
+      avatarColor: '#3d62a8',
+      completed: false,
+    },
+    {
+      id: 'assigned-2',
+      name: 'Draft initial project plan',
+      dueDate: 'Today',
+      dateColor: 'text-[#4cd195]',
+      avatarColor: '#c44053',
+      completed: false,
+    },
+    {
+      id: 'assigned-3',
+      name: 'Outline next steps',
+      dueDate: 'Tomorrow',
+      dateColor: 'text-[#6196f2]',
+      avatarColor: '#6b46c1',
+      completed: false,
+    },
+    {
+      id: 'assigned-4',
+      name: 'Research best practices',
+      dueDate: 'Wednesday',
+      dateColor: 'text-[#8a8886]',
+      avatarColor: '#2b7a4b',
+      completed: false,
+    },
+    {
+      id: 'assigned-5',
+      name: 'Sign off on final launch plan',
+      dueDate: 'Thursday',
+      dateColor: 'text-[#8a8886]',
+      avatarColor: '#3e5569',
+      completed: false,
+    },
+  ]);
+
+  const toggleAssignedTask = (id: string) => {
+    setAssignedTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+    );
+  };
+
+  // People stats list matching screenshot
+  const peopleStats = [
+    { id: 'p1', avatarColor: '#3d62a8', overdue: 7, completed: 4, upcoming: 6 },
+    { id: 'p2', avatarColor: '#c44053', overdue: 4, completed: 8, upcoming: 2 },
+    { id: 'p3', avatarColor: '#6b46c1', overdue: 3, completed: 8, upcoming: 0 },
+    { id: 'p4', avatarColor: '#2b7a4b', overdue: 0, completed: 3, upcoming: 1 },
+    { id: 'p5', avatarColor: '#3e5569', overdue: 1, completed: 2, upcoming: 4 },
+  ];
 
   const filteredTasks = tasks.filter((t) => {
     if (taskFilter === 'Completed') return t.completed;
@@ -339,6 +403,164 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* Row 3: Tasks I've assigned & People Widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Card 1: Tasks I've assigned */}
+        <div className="bg-[#252628] border border-[#333538] rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+          <div>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-[16px] font-bold text-white">Tasks I've assigned</h2>
+              <button className="p-1 rounded hover:bg-[#323336] text-[#8a8886] hover:text-white">
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[12.5px] text-[#8a8886] mb-4">
+              Track work you've delegated so you can see what needs prioritizing
+            </p>
+
+            {/* Task List Rows */}
+            <div className="space-y-1">
+              {assignedTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="flex items-center justify-between py-2 px-2.5 rounded-lg hover:bg-[#2c2d30] transition-colors group text-[13px]"
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <button
+                      type="button"
+                      onClick={() => toggleAssignedTask(task.id)}
+                      className={`w-[17px] h-[17px] rounded-full border flex items-center justify-center transition-all ${
+                        task.completed
+                          ? 'bg-[#38b273] border-[#38b273] text-white'
+                          : 'border-[#555659] hover:border-white'
+                      }`}
+                    >
+                      {task.completed && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                    </button>
+                    <span
+                      className={`truncate font-medium ${
+                        task.completed ? 'line-through text-[#8a8886]' : 'text-[#f5f4f3]'
+                      }`}
+                    >
+                      {task.name}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-[12px] flex-shrink-0">
+                    <span className={`font-medium ${task.dateColor}`}>{task.dueDate}</span>
+                    <div
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-white"
+                      style={{ backgroundColor: task.avatarColor }}
+                    >
+                      <User className="w-3 h-3 text-white/90" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Bottom Invite Teammate button */}
+          <div className="pt-4">
+            <button
+              onClick={openInviteModal}
+              className="inline-flex items-center justify-center bg-[#212224] hover:bg-[#2c2d30] border border-[#343639] hover:border-[#424449] text-[#c5c3c0] hover:text-white px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors"
+            >
+              Invite a teammate
+            </button>
+          </div>
+        </div>
+
+        {/* Card 2: People */}
+        <div className="bg-[#252628] border border-[#333538] rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+          <div>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-[16px] font-bold text-white">People</h2>
+              <button className="p-1 rounded hover:bg-[#323336] text-[#8a8886] hover:text-white">
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[12.5px] text-[#8a8886] mb-4">
+              See who's on track and who needs support at a glance.
+            </p>
+
+            {/* People rows matching Asana screenshot */}
+            <div className="space-y-3">
+              {peopleStats.map((person, idx) => {
+                // If real teammate exists at this index, show their name; otherwise show Asana placeholder pill
+                const realUser = users[idx + 1]; // users[0] is currentUser
+                return (
+                  <div
+                    key={person.id}
+                    className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-[#2c2d30] transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold"
+                        style={{ backgroundColor: realUser?.avatarColor || person.avatarColor }}
+                      >
+                        {realUser ? realUser.initials : <User className="w-3.5 h-3.5 text-white/90" />}
+                      </div>
+
+                      {realUser ? (
+                        <span className="text-[13px] font-medium text-[#f5f4f3] truncate max-w-[140px]">
+                          {realUser.name}
+                        </span>
+                      ) : (
+                        <div className="w-24 h-2.5 bg-[#2c2d30] rounded-full"></div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3 text-[12px] flex-shrink-0 font-medium">
+                      <span className={person.overdue > 0 ? 'text-[#ff6b72]' : 'text-[#5e5c5a]'}>
+                        {person.overdue} overdue
+                      </span>
+                      <span className="text-[#4cd195]">{person.completed} completed</span>
+                      <span className="text-[#8a8886]">{person.upcoming} upcoming</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Bottom Invite Teammate button */}
+          <div className="pt-4">
+            <button
+              onClick={openInviteModal}
+              className="inline-flex items-center justify-center bg-[#212224] hover:bg-[#2c2d30] border border-[#343639] hover:border-[#424449] text-[#c5c3c0] hover:text-white px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors"
+            >
+              Invite a teammate
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Row 4: Drag and drop new widgets area */}
+      {showDragArea && (
+        <div className="border border-dashed border-[#343639] rounded-2xl p-8 flex flex-col items-center justify-center relative bg-[#212224]/30">
+          <button
+            onClick={() => setShowDragArea(false)}
+            title="Dismiss"
+            className="absolute top-4 right-4 p-1 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#2c2d30] transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <p className="text-[14px] font-medium text-[#a2a09e] mb-3">
+            Drag and drop new widgets
+          </p>
+          <button
+            onClick={() => alert('Widget library: Drag widgets to customize your home dashboard')}
+            className="flex items-center gap-1.5 bg-[#252628] hover:bg-[#2e2f32] text-white px-3.5 py-1.5 rounded-lg border border-[#37383b] transition-colors font-medium text-[12px]"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add widgets</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
