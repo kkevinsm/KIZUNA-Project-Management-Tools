@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ChevronDown,
@@ -18,6 +18,17 @@ import {
   X,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import AddWidgetsDrawer from '@/components/dashboard/AddWidgetsDrawer';
+import {
+  PrivateNotepadWidget,
+  GoalsWidget,
+  PortfoliosWidget,
+  StatusUpdatesWidget,
+  UpcomingMeetingsWidget,
+  CommentsMentioningMeWidget,
+  DraftCommentsWidget,
+  FormsWidget,
+} from '@/components/dashboard/DashboardWidgets';
 
 export default function HomePage() {
   const {
@@ -33,6 +44,49 @@ export default function HomePage() {
 
   const [taskFilter, setTaskFilter] = useState<'Upcoming' | 'Overdue' | 'Completed'>('Upcoming');
   const [showDragArea, setShowDragArea] = useState(true);
+  const [isAddWidgetsOpen, setIsAddWidgetsOpen] = useState(false);
+  const [activeWidgets, setActiveWidgets] = useState<string[]>(['notepad', 'goals']);
+
+  // Restore dashboard widgets from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('kizuna_dashboard_widgets');
+      if (saved) {
+        setActiveWidgets(JSON.parse(saved));
+      }
+    } catch {
+      // fallback
+    }
+  }, []);
+
+  const toggleWidget = (widgetId: string) => {
+    setActiveWidgets((prev) => {
+      let updated: string[];
+      if (prev.includes(widgetId)) {
+        updated = prev.filter((id) => id !== widgetId);
+      } else {
+        updated = [...prev, widgetId];
+      }
+      try {
+        localStorage.setItem('kizuna_dashboard_widgets', JSON.stringify(updated));
+      } catch {
+        // silent
+      }
+      return updated;
+    });
+  };
+
+  const removeWidget = (widgetId: string) => {
+    setActiveWidgets((prev) => {
+      const updated = prev.filter((id) => id !== widgetId);
+      try {
+        localStorage.setItem('kizuna_dashboard_widgets', JSON.stringify(updated));
+      } catch {
+        // silent
+      }
+      return updated;
+    });
+  };
 
   // Initial delegated tasks matching Asana screenshot
   const [assignedTasks, setAssignedTasks] = useState([
@@ -132,7 +186,7 @@ export default function HomePage() {
           </div>
 
           <button
-            onClick={() => alert("Customize Dashboard: Add or rearrange widgets")}
+            onClick={() => setIsAddWidgetsOpen(true)}
             className="flex items-center gap-1 bg-[#252628] hover:bg-[#2e2f32] text-white px-3 py-1.5 rounded-lg border border-[#37383b] transition-colors font-medium text-[12px]"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -539,7 +593,75 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Row 4: Drag and drop new widgets area */}
+      {/* Row 4: Dynamic Custom Widgets (Added via 'Add widgets' drawer) */}
+      {activeWidgets.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {activeWidgets.map((wId) => {
+            switch (wId) {
+              case 'notepad':
+                return (
+                  <PrivateNotepadWidget
+                    key={wId}
+                    onRemove={() => removeWidget(wId)}
+                  />
+                );
+              case 'goals':
+                return (
+                  <GoalsWidget
+                    key={wId}
+                    onRemove={() => removeWidget(wId)}
+                  />
+                );
+              case 'portfolios':
+                return (
+                  <PortfoliosWidget
+                    key={wId}
+                    onRemove={() => removeWidget(wId)}
+                  />
+                );
+              case 'status_updates':
+                return (
+                  <StatusUpdatesWidget
+                    key={wId}
+                    onRemove={() => removeWidget(wId)}
+                  />
+                );
+              case 'upcoming_meetings':
+                return (
+                  <UpcomingMeetingsWidget
+                    key={wId}
+                    onRemove={() => removeWidget(wId)}
+                  />
+                );
+              case 'mentions':
+                return (
+                  <CommentsMentioningMeWidget
+                    key={wId}
+                    onRemove={() => removeWidget(wId)}
+                  />
+                );
+              case 'draft_comments':
+                return (
+                  <DraftCommentsWidget
+                    key={wId}
+                    onRemove={() => removeWidget(wId)}
+                  />
+                );
+              case 'forms':
+                return (
+                  <FormsWidget
+                    key={wId}
+                    onRemove={() => removeWidget(wId)}
+                  />
+                );
+              default:
+                return null;
+            }
+          })}
+        </div>
+      )}
+
+      {/* Row 5: Drag and drop new widgets area */}
       {showDragArea && (
         <div className="border border-dashed border-[#343639] rounded-2xl p-8 flex flex-col items-center justify-center relative bg-[#212224]/30">
           <button
@@ -553,7 +675,7 @@ export default function HomePage() {
             Drag and drop new widgets
           </p>
           <button
-            onClick={() => alert('Widget library: Drag widgets to customize your home dashboard')}
+            onClick={() => setIsAddWidgetsOpen(true)}
             className="flex items-center gap-1.5 bg-[#252628] hover:bg-[#2e2f32] text-white px-3.5 py-1.5 rounded-lg border border-[#37383b] transition-colors font-medium text-[12px]"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -561,6 +683,14 @@ export default function HomePage() {
           </button>
         </div>
       )}
+
+      {/* Slide-over Add Widgets Drawer matching Asana screenshots */}
+      <AddWidgetsDrawer
+        isOpen={isAddWidgetsOpen}
+        onClose={() => setIsAddWidgetsOpen(false)}
+        activeWidgets={activeWidgets}
+        onToggleWidget={toggleWidget}
+      />
     </div>
   );
 }
