@@ -8,6 +8,7 @@ export interface UserAccount {
   password?: string;
   initials: string;
   avatarColor: string;
+  avatarUrl?: string;
   workspace: string;
   role?: string;
 }

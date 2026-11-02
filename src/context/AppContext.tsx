@@ -27,7 +27,7 @@ interface AppContextType {
   createModalType: 'task' | 'project';
   isSidebarCollapsed: boolean;
   login: (email: string, password?: string) => { success: boolean; error?: string };
-  loginWithGoogle: (customGoogleAccount?: { name: string; email: string }) => { success: boolean };
+  loginWithGoogle: (customGoogleAccount?: { name: string; email: string; picture?: string }) => { success: boolean };
   signup: (name: string, email: string, password?: string) => { success: boolean; error?: string };
   logout: () => void;
   switchUser: (userId: string) => void;
@@ -199,10 +199,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  const loginWithGoogle = (customGoogleAccount?: { name: string; email: string }) => {
+  const loginWithGoogle = (customGoogleAccount?: { name: string; email: string; picture?: string }) => {
     // If specific account provided, use or register it; otherwise default to Kevin's Google account
     const email = customGoogleAccount?.email?.trim().toLowerCase() || 'karashii866@gmail.com';
     const name = customGoogleAccount?.name?.trim() || 'Kevin Safrisal';
+    const picture = customGoogleAccount?.picture;
 
     let user = users.find((u) => u.email.toLowerCase() === email);
     if (!user) {
@@ -213,10 +214,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         email,
         initials: getInitials(name),
         avatarColor: color,
+        avatarUrl: picture,
         workspace: 'My workspace',
         role: 'Member',
       };
       setUsers((prev) => [...prev, user!]);
+    } else if (picture && !user.avatarUrl) {
+      user = { ...user, avatarUrl: picture };
+      setUsers((prev) => prev.map((u) => (u.id === user!.id ? user! : u)));
     }
 
     setCurrentUser(user);
