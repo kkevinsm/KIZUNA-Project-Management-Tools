@@ -55,6 +55,7 @@ interface AppContextType {
     description?: string;
   }) => Task;
   updateTask: (taskId: string, updates: Partial<Task>) => void;
+  reorderTasks: (newTasks: Task[]) => void;
   toggleTaskComplete: (taskId: string) => void;
   deleteTask: (taskId: string) => void;
   createProject: (name: string, description?: string) => Project;
@@ -470,6 +471,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const reorderTasks = useCallback((newTasks: Task[]) => {
+    setTasks(newTasks);
+  }, []);
+
   const toggleTaskComplete = (taskId: string) => {
     setTasks((prev) =>
       prev.map((t) =>
@@ -611,6 +616,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         closeCreateModal,
         createTask,
         updateTask,
+        reorderTasks,
         toggleTaskComplete,
         deleteTask,
         createProject,
