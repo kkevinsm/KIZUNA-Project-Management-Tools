@@ -30,6 +30,8 @@ import {
   ClipboardList,
   Eye,
   Tag,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import TaskRow from '@/components/tasks/TaskRow';
@@ -82,6 +84,8 @@ export default function MyTasksPage() {
   const [isGroupPopoverOpen, setIsGroupPopoverOpen] = useState(false);
   const [isGroupFieldPickerOpen, setIsGroupFieldPickerOpen] = useState(false);
   const [isGroupOrderPickerOpen, setIsGroupOrderPickerOpen] = useState(false);
+  const [isGroupMoreMenuOpen, setIsGroupMoreMenuOpen] = useState(false);
+  const [showEmptyGroups, setShowEmptyGroups] = useState(true);
   const [isAddFilterMenuOpen, setIsAddFilterMenuOpen] = useState(false);
   const [isCompletedTasksSubmenuOpen, setIsCompletedTasksSubmenuOpen] = useState(false);
 
@@ -95,18 +99,19 @@ export default function MyTasksPage() {
   const [groupField, setGroupField] = useState<string>('section'); // 'section' | 'start_date' | 'due_date' | 'created_by' | 'created_on' | 'last_modified' | 'completed_on' | 'project' | 'none'
   const [groupOrder, setGroupOrder] = useState<string>('Custom order'); // 'Custom order' | 'Ascending' | 'Descending'
 
-  // Columns visibility state
+  // Columns visibility state matching Asana defaults
   const [columns, setColumns] = useState<Record<string, boolean>>({
-    project: true,
     dueDate: true,
+    collaborators: true,
+    project: true,
+    visibility: true,
     priority: true,
-    visibility: false,
-    assignee: false,
     createdBy: false,
     createdOn: false,
+    lastModifiedOn: false,
     completedOn: false,
-    likes: false,
     tags: false,
+    blockedBy: false,
   });
 
   const handleToggleColumn = (colKey: string) => {
@@ -131,6 +136,7 @@ export default function MyTasksPage() {
         setIsGroupPopoverOpen(false);
         setIsGroupFieldPickerOpen(false);
         setIsGroupOrderPickerOpen(false);
+        setIsGroupMoreMenuOpen(false);
         setIsAddFilterMenuOpen(false);
         setIsCompletedTasksSubmenuOpen(false);
         setOpenSectionMenu(null);
@@ -272,6 +278,23 @@ export default function MyTasksPage() {
       return [{ groupName: 'All tasks', tasks: sortedTasks, id: 'all' }];
     }
 
+    if (groupField === 'start_date' || groupField === 'due_date') {
+      let groups = [
+        { groupName: 'Today', id: 'today', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('today')) },
+        { groupName: 'Tomorrow', id: 'tomorrow', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('nov 4') || (t.dueDate || '').toLowerCase().includes('tomorrow')) },
+        { groupName: 'Next week', id: 'next_week', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('nov 10') || (t.dueDate || '').toLowerCase().includes('next week')) },
+        { groupName: 'Later', id: 'later', tasks: sortedTasks.filter((t) => !(t.dueDate || '').toLowerCase().includes('today') && !(t.dueDate || '').toLowerCase().includes('nov 4') && !(t.dueDate || '').toLowerCase().includes('nov 10') && t.dueDate) },
+        { groupName: 'No Due Date', id: 'no_due', tasks: sortedTasks.filter((t) => !t.dueDate) },
+      ];
+      if (!showEmptyGroups) {
+        groups = groups.filter((g) => g.tasks.length > 0);
+      }
+      if (groupOrder === 'Descending') {
+        groups.reverse();
+      }
+      return groups;
+    }
+
     if (groupField === 'project') {
       const projectMap = new Map<string, Task[]>();
       sortedTasks.forEach((t) => {
@@ -279,20 +302,15 @@ export default function MyTasksPage() {
         if (!projectMap.has(pName)) projectMap.set(pName, []);
         projectMap.get(pName)!.push(t);
       });
-      return Array.from(projectMap.entries()).map(([pName, pTasks]) => ({
+      let groups = Array.from(projectMap.entries()).map(([pName, pTasks]) => ({
         groupName: pName,
         id: pName,
         tasks: pTasks,
       }));
-    }
-
-    if (groupField === 'due_date') {
-      const groups = [
-        { groupName: 'Today', id: 'today', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('today')) },
-        { groupName: 'Upcoming', id: 'upcoming', tasks: sortedTasks.filter((t) => !(t.dueDate || '').toLowerCase().includes('today') && t.dueDate) },
-        { groupName: 'No Due Date', id: 'no_due', tasks: sortedTasks.filter((t) => !t.dueDate) },
-      ];
-      return groups.filter((g) => g.tasks.length > 0);
+      if (groupOrder === 'Descending') {
+        groups.reverse();
+      }
+      return groups;
     }
 
     // Default: Group by Section
@@ -481,21 +499,47 @@ export default function MyTasksPage() {
           <div className="flex items-center gap-2 text-[#bdbbb9] text-[12px]">
             {/* 1. FILTER BUTTON & ASANA FILTER POPOVER (Image 1) */}
             <div className="relative" data-popover>
-              <button
-                onClick={() => {
-                  setIsFilterPopoverOpen((prev) => !prev);
-                  setIsSortPopoverOpen(false);
-                  setIsGroupPopoverOpen(false);
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors ${
-                  isFilterActive || isFilterPopoverOpen
-                    ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
-                    : 'hover:text-white hover:bg-[#28292c]'
-                }`}
-              >
-                <Filter className="w-3.5 h-3.5" />
-                <span>Filter</span>
-              </button>
+              {filterMode !== 'all' ? (
+                <div className="inline-flex items-center bg-[#0d3880] text-white border border-[#1d4ea8] rounded-lg text-[12px] font-medium overflow-hidden shadow-xs">
+                  <button
+                    onClick={() => {
+                      setIsFilterPopoverOpen((prev) => !prev);
+                      setIsSortPopoverOpen(false);
+                      setIsGroupPopoverOpen(false);
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 hover:bg-[#1147a3] transition-colors"
+                  >
+                    <Filter className="w-3.5 h-3.5" />
+                    <span>Filters: 1</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFilterMode('all');
+                    }}
+                    className="px-1.5 py-1 hover:bg-[#1147a3] border-l border-[#1d4ea8] text-[#a5c2f7] hover:text-white transition-colors"
+                    title="Clear filter"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsFilterPopoverOpen((prev) => !prev);
+                    setIsSortPopoverOpen(false);
+                    setIsGroupPopoverOpen(false);
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors ${
+                    isFilterPopoverOpen
+                      ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
+                      : 'hover:text-white hover:bg-[#28292c]'
+                  }`}
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>Filter</span>
+                </button>
+              )}
 
               {/* Exact Asana Filter Popover */}
               {isFilterPopoverOpen && (
@@ -636,21 +680,47 @@ export default function MyTasksPage() {
 
             {/* 2. SORT BUTTON & ASANA SORT POPOVER (Image 2) */}
             <div className="relative" data-popover>
-              <button
-                onClick={() => {
-                  setIsSortPopoverOpen((prev) => !prev);
-                  setIsFilterPopoverOpen(false);
-                  setIsGroupPopoverOpen(false);
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors ${
-                  isSortActive || isSortPopoverOpen
-                    ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
-                    : 'hover:text-white hover:bg-[#28292c]'
-                }`}
-              >
-                <ArrowUpDown className="w-3.5 h-3.5" />
-                <span>Sort</span>
-              </button>
+              {sortField !== 'none' ? (
+                <div className="inline-flex items-center bg-[#0d3880] text-white border border-[#1d4ea8] rounded-lg text-[12px] font-medium overflow-hidden shadow-xs">
+                  <button
+                    onClick={() => {
+                      setIsSortPopoverOpen((prev) => !prev);
+                      setIsFilterPopoverOpen(false);
+                      setIsGroupPopoverOpen(false);
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 hover:bg-[#1147a3] transition-colors"
+                  >
+                    <ArrowUpDown className="w-3.5 h-3.5" />
+                    <span>Sorts: 1</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSortField('none');
+                    }}
+                    className="px-1.5 py-1 hover:bg-[#1147a3] border-l border-[#1d4ea8] text-[#a5c2f7] hover:text-white transition-colors"
+                    title="Clear sort"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsSortPopoverOpen((prev) => !prev);
+                    setIsFilterPopoverOpen(false);
+                    setIsGroupPopoverOpen(false);
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors ${
+                    isSortPopoverOpen
+                      ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
+                      : 'hover:text-white hover:bg-[#28292c]'
+                  }`}
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                  <span>Sort</span>
+                </button>
+              )}
 
               {/* Exact Asana Sort Popover */}
               {isSortPopoverOpen && (
@@ -716,21 +786,48 @@ export default function MyTasksPage() {
 
             {/* 3. GROUP BUTTON & ASANA GROUPS POPOVER (Image 3 & 4) */}
             <div className="relative" data-popover>
-              <button
-                onClick={() => {
-                  setIsGroupPopoverOpen((prev) => !prev);
-                  setIsFilterPopoverOpen(false);
-                  setIsSortPopoverOpen(false);
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors ${
-                  isGroupActive || isGroupPopoverOpen
-                    ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
-                    : 'hover:text-white hover:bg-[#28292c]'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Group</span>
-              </button>
+              {groupField !== 'section' ? (
+                <div className="inline-flex items-center bg-[#0d3880] text-white border border-[#1d4ea8] rounded-lg text-[12px] font-medium overflow-hidden shadow-xs">
+                  <button
+                    onClick={() => {
+                      setIsGroupPopoverOpen((prev) => !prev);
+                      setIsFilterPopoverOpen(false);
+                      setIsSortPopoverOpen(false);
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 hover:bg-[#1147a3] transition-colors"
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>Groups: 1</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGroupField('section');
+                      setGroupOrder('Custom order');
+                    }}
+                    className="px-1.5 py-1 hover:bg-[#1147a3] border-l border-[#1d4ea8] text-[#a5c2f7] hover:text-white transition-colors"
+                    title="Clear group"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsGroupPopoverOpen((prev) => !prev);
+                    setIsFilterPopoverOpen(false);
+                    setIsSortPopoverOpen(false);
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors ${
+                    isGroupPopoverOpen
+                      ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
+                      : 'hover:text-white hover:bg-[#28292c]'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Group</span>
+                </button>
+              )}
 
               {/* Exact Asana Groups Popover */}
               {isGroupPopoverOpen && (
@@ -748,7 +845,7 @@ export default function MyTasksPage() {
                     </div>
                     <button
                       onClick={() => {
-                        setGroupField('none');
+                        setGroupField('section');
                         setGroupOrder('Custom order');
                       }}
                       className="text-[12px] text-[#8a8886] hover:text-white transition-colors"
@@ -769,6 +866,7 @@ export default function MyTasksPage() {
                         onClick={() => {
                           setIsGroupFieldPickerOpen((prev) => !prev);
                           setIsGroupOrderPickerOpen(false);
+                          setIsGroupMoreMenuOpen(false);
                         }}
                         className="w-full flex items-center justify-between bg-[#252628] border border-[#37383b] hover:border-[#525357] rounded-lg px-3 py-1.5 text-[13px] text-white transition-colors"
                       >
@@ -810,6 +908,11 @@ export default function MyTasksPage() {
                                 key={gf.id}
                                 onClick={() => {
                                   setGroupField(gf.id);
+                                  if (gf.id === 'section') {
+                                    setGroupOrder('Custom order');
+                                  } else {
+                                    setGroupOrder('Ascending');
+                                  }
                                   setIsGroupFieldPickerOpen(false);
                                 }}
                                 className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-white hover:bg-[#2f3135] transition-colors"
@@ -836,50 +939,118 @@ export default function MyTasksPage() {
                       )}
                     </div>
 
-                    {/* Order Selector */}
+                    {/* Order Selector (Image 1) */}
                     <div className="relative w-36">
                       <button
                         type="button"
                         onClick={() => {
                           setIsGroupOrderPickerOpen((prev) => !prev);
                           setIsGroupFieldPickerOpen(false);
+                          setIsGroupMoreMenuOpen(false);
                         }}
-                        className="w-full flex items-center justify-between bg-[#252628] border border-[#37383b] hover:border-[#525357] rounded-lg px-3 py-1.5 text-[13px] text-white transition-colors"
+                        className="w-full flex items-center justify-between bg-[#252628] border border-[#37383b] hover:border-[#525357] rounded-lg px-2.5 py-1.5 text-[13px] text-white transition-colors"
                       >
-                        <span className="truncate">{groupOrder}</span>
-                        <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                        <div className="flex items-center gap-1.5 truncate">
+                          {groupOrder === 'Ascending' ? (
+                            <ArrowUp className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
+                          ) : groupOrder === 'Descending' ? (
+                            <ArrowDown className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
+                          ) : null}
+                          <span className="truncate">{groupOrder}</span>
+                        </div>
+                        <ChevronDown className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
                       </button>
 
                       {isGroupOrderPickerOpen && (
                         <div className="absolute right-0 top-full mt-1 w-36 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-50 text-[12.5px]">
-                          {['Custom order', 'Ascending', 'Descending'].map((ord) => (
+                          {groupField === 'section' ? (
                             <button
-                              key={ord}
                               onClick={() => {
-                                setGroupOrder(ord);
+                                setGroupOrder('Custom order');
                                 setIsGroupOrderPickerOpen(false);
                               }}
                               className="w-full text-left px-3 py-1.5 hover:bg-[#2f3135] text-white"
                             >
-                              {ord}
+                              Custom order
                             </button>
-                          ))}
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setGroupOrder('Ascending');
+                                  setIsGroupOrderPickerOpen(false);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-white"
+                              >
+                                <ArrowUp className="w-3.5 h-3.5 text-[#8a8886]" />
+                                <span>Ascending</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setGroupOrder('Descending');
+                                  setIsGroupOrderPickerOpen(false);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-white"
+                              >
+                                <ArrowDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                                <span>Descending</span>
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
 
-                    {/* More button */}
-                    <button
-                      onClick={() => alert('Additional group settings')}
-                      className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#28292c]"
-                      title="More options"
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
+                    {/* More button (Image 2) */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsGroupMoreMenuOpen((prev) => !prev);
+                          setIsGroupOrderPickerOpen(false);
+                          setIsGroupFieldPickerOpen(false);
+                        }}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          isGroupMoreMenuOpen ? 'bg-[#323336] text-white' : 'text-[#8a8886] hover:text-white hover:bg-[#28292c]'
+                        }`}
+                        title="More options"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+
+                      {/* Asana Show/Hide empty groups dropdown */}
+                      {isGroupMoreMenuOpen && (
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-[#252628] border border-[#37383b] rounded-xl shadow-2xl py-1.5 z-50 text-[12.5px]">
+                          <button
+                            onClick={() => {
+                              setShowEmptyGroups(false);
+                              setIsGroupMoreMenuOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left text-white transition-colors"
+                          >
+                            <span>Hide empty groups</span>
+                            {!showEmptyGroups && <Check className="w-3.5 h-3.5 text-[#4573d2]" />}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowEmptyGroups(true);
+                              setIsGroupMoreMenuOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left text-white transition-colors"
+                          >
+                            <span>Show empty groups</span>
+                            {showEmptyGroups && <Check className="w-3.5 h-3.5 text-[#4573d2]" />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Clear button */}
                     <button
-                      onClick={() => setGroupField('none')}
+                      onClick={() => {
+                        setGroupField('section');
+                        setGroupOrder('Custom order');
+                      }}
                       className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#28292c]"
                       title="Remove grouping"
                     >
@@ -1352,10 +1523,10 @@ export default function MyTasksPage() {
         onToggleColumn={handleToggleColumn}
         filterMode={filterMode}
         onFilterModeChange={(m) => setFilterMode(m)}
-        sortMode={sortField}
-        onSortModeChange={(s) => setSortField(s)}
-        groupMode={groupField}
-        onGroupModeChange={(g) => setGroupField(g)}
+        sortField={sortField}
+        onSortFieldChange={(s) => setSortField(s)}
+        groupField={groupField}
+        onGroupFieldChange={(g) => setGroupField(g)}
       />
     </div>
   );

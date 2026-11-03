@@ -22,15 +22,13 @@ import {
   Tag,
   Folder,
   Eye,
+  GripVertical,
+  ClipboardList,
+  Edit2,
+  CheckCircle2,
+  Hourglass,
+  Users,
 } from 'lucide-react';
-import { PriorityLevel } from '@/lib/types';
-
-export interface ColumnConfig {
-  id: string;
-  name: string;
-  visible: boolean;
-  canToggle: boolean;
-}
 
 interface ListOptionsDrawerProps {
   isOpen: boolean;
@@ -39,11 +37,10 @@ interface ListOptionsDrawerProps {
   onToggleColumn: (columnKey: string) => void;
   filterMode: string;
   onFilterModeChange: (mode: any) => void;
-  sortMode: string;
-  onSortModeChange: (mode: any) => void;
-  groupMode: string;
-  onGroupModeChange: (mode: any) => void;
-  onOpenFiltersDrawer?: () => void;
+  sortField: string;
+  onSortFieldChange: (field: any) => void;
+  groupField: string;
+  onGroupFieldChange: (field: any) => void;
 }
 
 export default function ListOptionsDrawer({
@@ -53,10 +50,10 @@ export default function ListOptionsDrawer({
   onToggleColumn,
   filterMode,
   onFilterModeChange,
-  sortMode,
-  onSortModeChange,
-  groupMode,
-  onGroupModeChange,
+  sortField,
+  onSortFieldChange,
+  groupField,
+  onGroupFieldChange,
 }: ListOptionsDrawerProps) {
   const [currentView, setCurrentView] = useState<'main' | 'columns' | 'filters' | 'sorts' | 'groups'>('main');
   const [viewTitle, setViewTitle] = useState('List');
@@ -64,20 +61,28 @@ export default function ListOptionsDrawer({
   if (!isOpen) return null;
 
   const hiddenCount = Object.values(columns).filter((v) => !v).length;
+  const isSortActive = sortField !== 'none';
+  const isGroupActive = groupField !== 'section';
+  const isFilterActive = filterMode !== 'all';
 
   return (
-    <div className="fixed inset-y-0 right-0 w-[340px] bg-[#1e1f21] border-l border-[#2b2c2e] shadow-2xl z-50 flex flex-col text-white animate-in slide-in-from-right duration-200">
+    <div className="fixed inset-y-0 right-0 w-[360px] bg-[#1e1f21] border-l border-[#2b2c2e] shadow-2xl z-50 flex flex-col text-white animate-in slide-in-from-right duration-200">
       {/* Top Header */}
       <div className="h-[48px] px-4 border-b border-[#2b2c2e] flex items-center justify-between">
         {currentView === 'main' ? (
-          <h2 className="text-[15px] font-bold text-white">List</h2>
+          <h2 className="text-[16px] font-bold text-white">List</h2>
         ) : (
           <button
             onClick={() => setCurrentView('main')}
-            className="flex items-center gap-1.5 text-[13px] text-[#bdbbb9] hover:text-white"
+            className="flex items-center gap-2 text-[14px] text-[#bdbbb9] hover:text-white"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="font-semibold capitalize">{currentView}</span>
+            <span className="font-semibold">
+              {currentView === 'columns' && 'Show/hide columns'}
+              {currentView === 'filters' && 'Filters'}
+              {currentView === 'sorts' && 'Sorts'}
+              {currentView === 'groups' && 'Groups'}
+            </span>
           </button>
         )}
 
@@ -108,7 +113,7 @@ export default function ListOptionsDrawer({
                     type="text"
                     value={viewTitle}
                     onChange={(e) => setViewTitle(e.target.value)}
-                    className="w-full bg-[#252628] border border-[#37383b] focus:border-[#4573d2] rounded px-2 py-1 text-[13px] text-white outline-none"
+                    className="w-full bg-[#252628] border border-[#37383b] focus:border-[#4573d2] rounded px-2.5 py-1 text-[13px] text-white outline-none"
                   />
                 </div>
               </div>
@@ -116,18 +121,18 @@ export default function ListOptionsDrawer({
 
             <div className="h-px bg-[#2b2c2e] my-3" />
 
-            {/* Menu Nav Links */}
+            {/* Menu Nav Links (Image 4) */}
             <div className="space-y-1 text-[13px]">
               {/* Show/Hide Columns */}
               <button
                 onClick={() => setCurrentView('columns')}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#252628] text-[#f5f4f3] transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-[#252628] text-[#f5f4f3] transition-colors"
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-3">
                   <Columns className="w-4 h-4 text-[#8a8886]" />
                   <span>Show/hide columns</span>
                 </div>
-                <div className="flex items-center gap-1 text-[#8a8886] text-[12px]">
+                <div className="flex items-center gap-1.5 text-[#8a8886] text-[12px]">
                   <span>{hiddenCount} hidden</span>
                   <ChevronRight className="w-4 h-4" />
                 </div>
@@ -136,37 +141,46 @@ export default function ListOptionsDrawer({
               {/* Filters */}
               <button
                 onClick={() => setCurrentView('filters')}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#252628] text-[#f5f4f3] transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-[#252628] text-[#f5f4f3] transition-colors"
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-3">
                   <Filter className="w-4 h-4 text-[#8a8886]" />
                   <span>Filters</span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-[#8a8886]" />
+                <div className="flex items-center gap-1.5 text-[#8a8886] text-[12px]">
+                  {isFilterActive && <span>1 applied</span>}
+                  <ChevronRight className="w-4 h-4" />
+                </div>
               </button>
 
               {/* Sorts */}
               <button
                 onClick={() => setCurrentView('sorts')}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#252628] text-[#f5f4f3] transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-[#252628] text-[#f5f4f3] transition-colors"
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-3">
                   <ArrowUpDown className="w-4 h-4 text-[#8a8886]" />
                   <span>Sorts</span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-[#8a8886]" />
+                <div className="flex items-center gap-1.5 text-[#8a8886] text-[12px]">
+                  {isSortActive && <span>1 applied</span>}
+                  <ChevronRight className="w-4 h-4" />
+                </div>
               </button>
 
               {/* Groups */}
               <button
                 onClick={() => setCurrentView('groups')}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#252628] text-[#f5f4f3] transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-[#252628] text-[#f5f4f3] transition-colors"
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-3">
                   <Layers className="w-4 h-4 text-[#8a8886]" />
                   <span>Groups</span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-[#8a8886]" />
+                <div className="flex items-center gap-1.5 text-[#8a8886] text-[12px]">
+                  {isGroupActive && <span>1 applied</span>}
+                  <ChevronRight className="w-4 h-4" />
+                </div>
               </button>
             </div>
 
@@ -184,44 +198,64 @@ export default function ListOptionsDrawer({
           </>
         )}
 
-        {/* Columns Subview */}
+        {/* Columns Subview with iOS Style Toggles (Image 3) */}
         {currentView === 'columns' && (
           <div className="space-y-3">
-            <p className="text-[12px] text-[#8a8886]">
-              Choose which fields appear as columns in your task list:
-            </p>
-            <div className="space-y-1">
+            {/* Subheader with description & Add button */}
+            <div className="flex items-center justify-between pb-2 border-b border-[#2b2c2e]">
+              <span className="text-[12px] text-[#8a8886]">
+                Show, hide, and reorder columns in this view
+              </span>
+              <button
+                onClick={() => alert('Add custom field / column')}
+                className="flex items-center gap-1 px-2 py-1 bg-[#2b2c2e] hover:bg-[#3562be] rounded text-[12px] text-white font-medium transition-colors shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add</span>
+              </button>
+            </div>
+
+            {/* List of Columns matching Image 3 */}
+            <div className="divide-y divide-[#28292c]">
               {[
-                { id: 'project', label: 'Projects', icon: Folder },
                 { id: 'dueDate', label: 'Due date', icon: Calendar },
-                { id: 'priority', label: 'Priority', icon: SlidersHorizontal },
+                { id: 'collaborators', label: 'Collaborators', icon: GripVertical },
+                { id: 'project', label: 'Projects', icon: ClipboardList },
                 { id: 'visibility', label: 'Task visibility', icon: Eye },
-                { id: 'assignee', label: 'Assignee', icon: User },
                 { id: 'createdBy', label: 'Created by', icon: User },
                 { id: 'createdOn', label: 'Created on', icon: Clock },
-                { id: 'completedOn', label: 'Completed on', icon: Clock },
-                { id: 'likes', label: 'Likes', icon: ThumbsUp },
+                { id: 'lastModifiedOn', label: 'Last modified on', icon: Edit2 },
+                { id: 'completedOn', label: 'Completed on', icon: CheckCircle2 },
                 { id: 'tags', label: 'Tags', icon: Tag },
+                { id: 'blockedBy', label: 'Blocked by', icon: Hourglass },
               ].map((col) => {
                 const IconComponent = col.icon;
-                const isChecked = !!columns[col.id];
+                const isEnabled = !!columns[col.id];
 
                 return (
-                  <label
+                  <div
                     key={col.id}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#252628] cursor-pointer text-[13px] transition-colors"
+                    onClick={() => onToggleColumn(col.id)}
+                    className="flex items-center justify-between py-2.5 px-1 hover:bg-[#252628]/60 cursor-pointer rounded-md transition-colors"
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-3">
                       <IconComponent className="w-4 h-4 text-[#8a8886]" />
-                      <span>{col.label}</span>
+                      <span className="text-[13px] text-[#f5f4f3]">{col.label}</span>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => onToggleColumn(col.id)}
-                      className="rounded accent-[#4573d2] w-4 h-4 cursor-pointer"
-                    />
-                  </label>
+
+                    {/* iOS style toggle switch */}
+                    <div
+                      className={`w-9 h-5 rounded-full transition-colors relative flex items-center px-0.5 cursor-pointer ${
+                        isEnabled ? 'bg-[#4573d2]' : 'bg-[#3b3d42]'
+                      }`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${
+                          isEnabled ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -236,15 +270,14 @@ export default function ListOptionsDrawer({
               {[
                 { id: 'incomplete', label: 'Incomplete tasks' },
                 { id: 'completed', label: 'Completed tasks' },
-                { id: 'all', label: 'All tasks (No completion filter)' },
-                { id: 'due_today', label: 'Due today' },
+                { id: 'all', label: 'All tasks' },
                 { id: 'due_this_week', label: 'Due this week' },
                 { id: 'due_next_week', label: 'Due next week' },
               ].map((opt) => (
                 <button
                   key={opt.id}
                   onClick={() => onFilterModeChange(opt.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-[13px] transition-colors ${
                     filterMode === opt.id
                       ? 'bg-[#1b2b48] text-[#4573d2] font-semibold'
                       : 'hover:bg-[#252628] text-[#f5f4f3]'
@@ -277,15 +310,15 @@ export default function ListOptionsDrawer({
               ].map((opt) => (
                 <button
                   key={opt.id}
-                  onClick={() => onSortModeChange(opt.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${
-                    sortMode === opt.id
+                  onClick={() => onSortFieldChange(opt.id)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-[13px] transition-colors ${
+                    sortField === opt.id
                       ? 'bg-[#1b2b48] text-[#4573d2] font-semibold'
                       : 'hover:bg-[#252628] text-[#f5f4f3]'
                   }`}
                 >
                   <span>{opt.label}</span>
-                  {sortMode === opt.id && <Check className="w-4 h-4 text-[#4573d2]" />}
+                  {sortField === opt.id && <Check className="w-4 h-4 text-[#4573d2]" />}
                 </button>
               ))}
             </div>
@@ -310,15 +343,15 @@ export default function ListOptionsDrawer({
               ].map((opt) => (
                 <button
                   key={opt.id}
-                  onClick={() => onGroupModeChange(opt.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${
-                    groupMode === opt.id
+                  onClick={() => onGroupFieldChange(opt.id)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-[13px] transition-colors ${
+                    groupField === opt.id
                       ? 'bg-[#1b2b48] text-[#4573d2] font-semibold'
                       : 'hover:bg-[#252628] text-[#f5f4f3]'
                   }`}
                 >
                   <span>{opt.label}</span>
-                  {groupMode === opt.id && <Check className="w-4 h-4 text-[#4573d2]" />}
+                  {groupField === opt.id && <Check className="w-4 h-4 text-[#4573d2]" />}
                 </button>
               ))}
             </div>
