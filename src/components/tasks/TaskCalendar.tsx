@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { useApp } from '@/context/AppContext';
+import CalendarOptionsDrawer from './CalendarOptionsDrawer';
 
 interface TaskCalendarProps {
   tasks: Task[];
@@ -91,8 +92,10 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'incomplete' | 'completed'>('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const [isOptionsDrawerOpen, setIsOptionsDrawerOpen] = useState(false);
   const [showWeekends, setShowWeekends] = useState(true);
+  const [showMultiDayTasks, setShowMultiDayTasks] = useState(true);
+  const [taskColorMode, setTaskColorMode] = useState<'default' | 'priority' | 'project'>('default');
 
   // Week offset from base week (November 1-7, 2026)
   const [weekOffset, setWeekOffset] = useState(0);
@@ -175,13 +178,53 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
   ];
 
   // Map spanning tasks
-  const spanningTasks = filteredTasks
-    .map((task, idx) => {
-      const span = getTaskWeekSpan(task, weekDays, idx);
-      const palette = palettes[idx % palettes.length];
-      return { task, span, palette };
-    })
-    .filter((item): item is { task: Task; span: { colStart: number; colEnd: number; isMultiDay: boolean }; palette: typeof palettes[0] } => item.span !== null && item.span.isMultiDay);
+  const spanningTasks = showMultiDayTasks
+    ? filteredTasks
+        .map((task, idx) => {
+          const span = getTaskWeekSpan(task, weekDays, idx);
+          let palette = palettes[idx % palettes.length];
+          if (taskColorMode === 'priority') {
+            if (task.priority === 'High') {
+              palette = {
+                bg: 'bg-[#f58e8e] hover:bg-[#f7a4a4]',
+                text: 'text-[#421111]',
+                checkBorder: 'border-[#421111]/50 hover:border-[#421111]',
+                checkBg: 'bg-[#421111]',
+                checkText: 'text-[#f58e8e]',
+                handleBorder: 'border-[#421111]/50',
+              };
+            } else if (task.priority === 'Medium') {
+              palette = {
+                bg: 'bg-[#f8be4e] hover:bg-[#fac561]',
+                text: 'text-[#3d2402]',
+                checkBorder: 'border-[#3d2402]/50 hover:border-[#3d2402]',
+                checkBg: 'bg-[#3d2402]',
+                checkText: 'text-[#f8be4e]',
+                handleBorder: 'border-[#3d2402]/50',
+              };
+            } else {
+              palette = {
+                bg: 'bg-[#80eed2] hover:bg-[#8ef3da]',
+                text: 'text-[#0a382b]',
+                checkBorder: 'border-[#0a382b]/50 hover:border-[#0a382b]',
+                checkBg: 'bg-[#0a382b]',
+                checkText: 'text-[#80eed2]',
+                handleBorder: 'border-[#0a382b]/50',
+              };
+            }
+          }
+          return { task, span, palette };
+        })
+        .filter(
+          (
+            item
+          ): item is {
+            task: Task;
+            span: { colStart: number; colEnd: number; isMultiDay: boolean };
+            palette: typeof palettes[0];
+          } => item.span !== null && item.span.isMultiDay
+        )
+    : [];
 
   const spanningTaskIds = new Set(spanningTasks.map((s) => s.task.id));
   const otherTasks = filteredTasks.filter((t) => !spanningTaskIds.has(t.id));
@@ -247,7 +290,7 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
               onClick={() => {
                 setIsViewDropdownOpen(!isViewDropdownOpen);
                 setIsFilterOpen(false);
-                setIsOptionsOpen(false);
+                setIsOptionsDrawerOpen(false);
               }}
               className="flex items-center gap-1.5 text-[#c5c3c0] hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-[#28292c] transition-colors"
             >
@@ -292,7 +335,7 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
               onClick={() => {
                 setIsFilterOpen(!isFilterOpen);
                 setIsViewDropdownOpen(false);
-                setIsOptionsOpen(false);
+                setIsOptionsDrawerOpen(false);
               }}
               className="flex items-center gap-1.5 text-[#c5c3c0] hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-[#28292c] transition-colors"
             >
@@ -342,32 +385,18 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
             )}
           </div>
 
-          {/* Options Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setIsOptionsOpen(!isOptionsOpen);
-                setIsViewDropdownOpen(false);
-                setIsFilterOpen(false);
-              }}
-              className="flex items-center gap-1.5 text-[#c5c3c0] hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-[#28292c] transition-colors"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-[#8a8886]" />
-              <span>Options</span>
-            </button>
-
-            {isOptionsOpen && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-[#252628] border border-[#343639] rounded-xl shadow-xl z-30 py-1.5">
-                <button
-                  onClick={() => setShowWeekends(!showWeekends)}
-                  className="w-full text-left px-3 py-1.5 text-[12.5px] flex items-center justify-between hover:bg-[#2e2f33] text-white"
-                >
-                  <span>Show weekends</span>
-                  {showWeekends && <Check className="w-3.5 h-3.5 text-[#4573d2]" />}
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Options Button */}
+          <button
+            onClick={() => {
+              setIsOptionsDrawerOpen(true);
+              setIsViewDropdownOpen(false);
+              setIsFilterOpen(false);
+            }}
+            className="flex items-center gap-1.5 text-[#c5c3c0] hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-[#28292c] transition-colors"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-[#8a8886]" />
+            <span>Options</span>
+          </button>
 
           {/* Search Icon */}
           <button
@@ -622,6 +651,22 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
           </div>
         </div>
       )}
+
+      {/* Calendar Options Side Panel matching Asana screenshots */}
+      <CalendarOptionsDrawer
+        isOpen={isOptionsDrawerOpen}
+        onClose={() => setIsOptionsDrawerOpen(false)}
+        viewMode={viewMode}
+        onViewModeChange={(mode) => setViewMode(mode)}
+        showWeekends={showWeekends}
+        onToggleWeekends={() => setShowWeekends(!showWeekends)}
+        showMultiDayTasks={showMultiDayTasks}
+        onToggleMultiDayTasks={() => setShowMultiDayTasks(!showMultiDayTasks)}
+        taskColorMode={taskColorMode}
+        onTaskColorModeChange={(mode) => setTaskColorMode(mode)}
+        filterMode={filterMode}
+        onFilterModeChange={(mode) => setFilterMode(mode)}
+      />
     </div>
   );
 }
