@@ -11,7 +11,7 @@ import TaskList from '@/components/tasks/TaskList';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskCalendar from '@/components/tasks/TaskCalendar';
 import TaskDashboard from '@/components/tasks/TaskDashboard';
-import FileManager from '@/components/files/FileManager';
+import TaskFiles from '@/components/tasks/TaskFiles';
 
 export default function MyTasksPage() {
   const { tasks, currentUser, viewConfigs } = useApp();
@@ -58,49 +58,48 @@ export default function MyTasksPage() {
         </div>
 
         {/* View Tabs */}
-        <div className="flex items-center gap-1.5 text-[13px] font-medium pb-1">
-          {(['List', 'Board', 'Calendar', 'Dashboard', 'Files'] as const).map((tab) => {
-            const config = viewConfigs[tab] || { name: tab, icon: '' };
-            const isActive = activeTab === tab;
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
-                  isActive
-                    ? 'bg-[#0c326f] text-white font-medium shadow-xs'
-                    : 'text-[#a2a09e] hover:text-white hover:bg-[#252628]/40'
-                }`}
-              >
-                {config.icon && <span className="text-[14px] leading-none">{config.icon}</span>}
-                <span>{config.name || tab}</span>
-              </button>
-            );
-          })}
-          <button
-            onClick={() => alert('Add view tab: Timeline, Gantt, Form')}
-            className="text-[#8a8886] hover:text-white px-2 py-1 font-bold rounded-lg hover:bg-[#252628]/40 transition-colors cursor-pointer text-[14px]"
-            title="Add tab"
-          >
-            +
-          </button>
+          <div className="flex items-center gap-1.5 text-[13px] font-medium pb-1">
+            {(['List', 'Board', 'Calendar', 'Dashboard', 'Files'] as const).map((tab) => {
+              const config = viewConfigs[tab] || { name: tab, icon: '' };
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${isActive
+                      ? 'bg-[#0c326f] text-white font-medium shadow-xs'
+                      : 'text-[#a2a09e] hover:text-white hover:bg-[#252628]/40'
+                    }`}
+                >
+                  {config.icon && <span className="text-[14px] leading-none">{config.icon}</span>}
+                  <span>{config.name || tab}</span>
+                </button>
+              );
+            })}
+            <button
+              onClick={() => alert('Add view tab: Timeline, Gantt, Form')}
+              className="text-[#8a8886] hover:text-white px-2 py-1 font-bold rounded-lg hover:bg-[#252628]/40 transition-colors cursor-pointer text-[14px]"
+              title="Add tab"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        {/* Main Content Body */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {activeTab === 'List' && <TaskList tasks={tasks} initialSections={sections} />}
+
+          {activeTab === 'Board' && <TaskBoard sections={sections} tasks={tasks} />}
+
+          {activeTab === 'Calendar' && <TaskCalendar tasks={tasks} />}
+
+          {activeTab === 'Dashboard' && (
+            <TaskDashboard tasks={tasks} projectName="My Tasks" />
+          )}
+
+          {activeTab === 'Files' && <TaskFiles tasks={tasks} projectName="My tasks" />}
         </div>
       </div>
-
-      {/* Main Content Body */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        {activeTab === 'List' && <TaskList tasks={tasks} initialSections={sections} />}
-
-        {activeTab === 'Board' && <TaskBoard sections={sections} tasks={tasks} />}
-
-        {activeTab === 'Calendar' && <TaskCalendar tasks={tasks} />}
-
-        {activeTab === 'Dashboard' && (
-          <TaskDashboard tasks={tasks} projectName="My Tasks" />
-        )}
-
-        {activeTab === 'Files' && <FileManager />}
-      </div>
-    </div>
-  );
+      );
 }
