@@ -33,26 +33,27 @@ function getTaskWeekSpan(
 
   if (text.includes('today')) {
     startNum = 2;
-    endNum = text.includes('nov 4') ? 4 : 2;
-  }
-
-  const nums = text.match(/\d+/g);
-  if (nums && nums.length >= 2) {
-    startNum = parseInt(nums[0], 10);
-    endNum = parseInt(nums[nums.length - 1], 10);
-  } else if (nums && nums.length === 1) {
-    startNum = parseInt(nums[0], 10);
-    endNum = parseInt(nums[0], 10);
-  } else if (!text) {
-    // If no due date, fallback for Task 1 and Task 2
-    if (defaultIndex === 0) {
-      startNum = 2;
-      endNum = 4;
-    } else if (defaultIndex === 1) {
-      startNum = 3;
-      endNum = 5;
-    } else {
-      return null;
+    const nums = text.match(/\d+/g);
+    endNum = nums && nums.length > 0 ? parseInt(nums[0], 10) : (text.includes('nov 4') ? 4 : 2);
+  } else {
+    const nums = text.match(/\d+/g);
+    if (nums && nums.length >= 2) {
+      startNum = parseInt(nums[0], 10);
+      endNum = parseInt(nums[nums.length - 1], 10);
+    } else if (nums && nums.length === 1) {
+      startNum = parseInt(nums[0], 10);
+      endNum = parseInt(nums[0], 10);
+    } else if (!text) {
+      // If no due date, fallback for Task 1 and Task 2
+      if (defaultIndex === 0) {
+        startNum = 2;
+        endNum = 4;
+      } else if (defaultIndex === 1) {
+        startNum = 3;
+        endNum = 5;
+      } else {
+        return null;
+      }
     }
   }
 
@@ -122,16 +123,55 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
 
   const handleUpdateFilter = (id: string, updates: Partial<CalendarFilterItem>) => {
     setCalendarFilters((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, ...updates } : f))
+      prev.map((f) => {
+        if (f.id === id) {
+          const updated = { ...f, ...updates };
+          if (
+            updated.type === 'completion' &&
+            (updated.value === 'all' || updated.value === 'incomplete' || updated.value === 'completed')
+          ) {
+            setFilterMode(updated.value as any);
+          }
+          return updated;
+        }
+        return f;
+      })
     );
   };
 
   const handleRemoveFilter = (id: string) => {
-    setCalendarFilters((prev) => prev.filter((f) => f.id !== id));
+    setCalendarFilters((prev) => {
+      const removed = prev.find((f) => f.id === id);
+      if (removed?.type === 'completion') {
+        setFilterMode('all');
+      }
+      return prev.filter((f) => f.id !== id);
+    });
   };
 
   const handleClearFilters = () => {
     setCalendarFilters([]);
+    setFilterMode('all');
+  };
+
+  // Synchronized toolbar filter handler
+  const handleToolbarFilterChange = (mode: 'all' | 'incomplete' | 'completed') => {
+    setFilterMode(mode);
+    setCalendarFilters((prev) => {
+      const exists = prev.some((f) => f.type === 'completion');
+      if (exists) {
+        return prev.map((f) => (f.type === 'completion' ? { ...f, value: mode } : f));
+      }
+      return [
+        ...prev,
+        {
+          id: `filter-comp-${Date.now()}`,
+          type: 'completion',
+          operator: 'is',
+          value: mode,
+        },
+      ];
+    });
   };
 
   // Week offset from base week (November 1-7, 2026)
@@ -173,57 +213,89 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
 
   // Stacked filter evaluation (AND condition across all active filters)
   const filteredTasks = tasks.filter((t) => {
-    // 1. Quick toolbar filter mode
-    if (filterMode === 'completed' && !t.completed) return false;
-    if (filterMode === 'incomplete' && t.completed) return false;
-
-    // 2. Evaluate all stacked filters
+    // Evaluate all stacked filters
     return calendarFilters.every((f) => {
-      // Completion status
+      // 1. Completion status
       if (f.type === 'completion') {
-        if (f.value === 'completed') return !!t.completed;
-        if (f.value === 'incomplete') return !t.completed;
-        return true;
+        if (f.value === 'completed') return t.completed === true;
+        if (f.value === 'incomplete') return t.completed !== true;
+        return true; // 'all'
       }
 
-      // Created by
+      // 2. Created by
       if (f.type === 'creator') {
-        const targetPerson = (f.value || 'Kevin Safrisal').toLowerCase();
+        const targetPerson = (f.value || 'Kevin Safrisal').toLowerCase().trim();
         if (targetPerson === 'any teammate') return true;
+
+        const assigneeName = (t.assignee?.name || '').toLowerCase().trim();
         const matchesAssignee =
-          (t.assignee?.name || '').toLowerCase().includes(targetPerson) ||
-          targetPerson.includes('kevin');
+          assigneeName.includes(targetPerson) ||
+          (targetPerson.includes('kevin') && assigneeName.includes('kevin'));
+
         return f.operator === 'is_not' ? !matchesAssignee : matchesAssignee;
       }
 
-      // Task type
+      // 3. Task type (Tasks, Milestones, Approvals)
       if (f.type === 'task_type') {
-        const types = f.value.split(',').filter(Boolean);
+        const types = f.value
+          .split(',')
+          .map((x) => x.trim().toLowerCase())
+          .filter(Boolean);
         if (types.length === 0) return true;
-        const isMilestone = t.name.toLowerCase().includes('milestone');
-        const isApproval = t.name.toLowerCase().includes('approval');
-        const isRegular = !isMilestone && !isApproval;
+
+        const isMilestone =
+          (t as any).taskType === 'milestone' || t.name.toLowerCase().includes('milestone');
+        const isApproval =
+          (t as any).taskType === 'approval' || t.name.toLowerCase().includes('approval');
+        const isRegularTask = !isMilestone && !isApproval;
 
         let matchesType = false;
         if (types.includes('milestones') && isMilestone) matchesType = true;
         if (types.includes('approvals') && isApproval) matchesType = true;
-        if (types.includes('tasks') && isRegular) matchesType = true;
+        if (types.includes('tasks') && isRegularTask) matchesType = true;
 
         return f.operator === 'is_not' ? !matchesType : matchesType;
       }
 
-      // Date based filters (created_on, last_modified, completed_on)
+      // 4. Date based filters (created_on, last_modified, completed_on)
       if (f.type === 'created_on' || f.type === 'last_modified' || f.type === 'completed_on') {
-        if (f.value === 'today' || f.value === 'this_week' || f.value === 'last_14_days') {
-          return true;
+        const dStr = t.createdAt || '';
+        let taskDay = 3;
+        let taskMonth = 11;
+        let taskYear = 2026;
+
+        if (dStr) {
+          const parsed = new Date(dStr);
+          if (!isNaN(parsed.getTime())) {
+            taskDay = parsed.getUTCDate();
+            taskMonth = parsed.getUTCMonth() + 1; // 1-12
+            taskYear = parsed.getUTCFullYear();
+          }
         }
-        if (f.value === 'yesterday') {
-          return (
-            (t.dueDate || '').toLowerCase().includes('nov 2') ||
-            (t.dueDate || '').toLowerCase().includes('yesterday')
-          );
-        }
-        return true;
+
+        const isToday = taskYear === 2026 && taskMonth === 11 && taskDay === 3;
+        const isYesterday = taskYear === 2026 && taskMonth === 11 && taskDay === 2;
+        const isThisWeek = taskYear === 2026 && taskMonth === 11 && taskDay >= 1 && taskDay <= 7;
+        const isLastWeek = taskYear === 2026 && taskMonth === 10 && taskDay >= 25 && taskDay <= 31;
+        const isLast14Days =
+          (taskYear === 2026 && taskMonth === 11 && taskDay <= 3) ||
+          (taskYear === 2026 && taskMonth === 10 && taskDay >= 20);
+        const isInLastMonth = taskYear === 2026 && taskMonth === 10;
+        const isOverOneMonthAgo = taskYear < 2026 || (taskYear === 2026 && taskMonth < 10);
+
+        let matchesDate = false;
+        if (f.value === 'today') matchesDate = isToday;
+        else if (f.value === 'yesterday') matchesDate = isYesterday;
+        else if (f.value === 'this_week') matchesDate = isThisWeek;
+        else if (f.value === 'last_week') matchesDate = isLastWeek;
+        else if (f.value === 'last_14_days') matchesDate = isLast14Days;
+        else if (f.value === 'in_the_last_month') matchesDate = isInLastMonth;
+        else if (f.value === 'over_one_month_ago') matchesDate = isOverOneMonthAgo;
+        else matchesDate = true;
+
+        if (f.operator === 'is_before') return !isToday && !isThisWeek;
+        if (f.operator === 'is_after') return isToday;
+        return matchesDate;
       }
 
       return true;
@@ -436,7 +508,7 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
               <div className="absolute right-0 top-full mt-1 w-44 bg-[#252628] border border-[#343639] rounded-xl shadow-xl z-30 py-1">
                 <button
                   onClick={() => {
-                    setFilterMode('all');
+                    handleToolbarFilterChange('all');
                     setIsFilterOpen(false);
                   }}
                   className={`w-full text-left px-3 py-1.5 text-[12.5px] flex items-center justify-between hover:bg-[#2e2f33] ${
@@ -448,7 +520,7 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
                 </button>
                 <button
                   onClick={() => {
-                    setFilterMode('incomplete');
+                    handleToolbarFilterChange('incomplete');
                     setIsFilterOpen(false);
                   }}
                   className={`w-full text-left px-3 py-1.5 text-[12.5px] flex items-center justify-between hover:bg-[#2e2f33] ${
@@ -460,7 +532,7 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
                 </button>
                 <button
                   onClick={() => {
-                    setFilterMode('completed');
+                    handleToolbarFilterChange('completed');
                     setIsFilterOpen(false);
                   }}
                   className={`w-full text-left px-3 py-1.5 text-[12.5px] flex items-center justify-between hover:bg-[#2e2f33] ${
@@ -606,7 +678,7 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
                 const text = (t.dueDate || '').toLowerCase();
                 return (
                   text.includes(`nov ${day.dayNumber}`) ||
-                  (day.dayNumber === 2 && text.includes('today'))
+                  (isToday && text.includes('today'))
                 );
               });
 
@@ -619,39 +691,57 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
                 >
                   {/* Single day task chips */}
                   <div className="space-y-1.5 w-full">
-                    {dayTasks.map((t) => (
-                      <div
-                        key={t.id}
-                        onClick={() => openTaskDrawer(t.id)}
-                        className={`bg-[#2a2b2f] hover:bg-[#333539] border text-white p-2 rounded-lg text-[12px] truncate cursor-pointer transition-colors shadow-sm flex items-center gap-2 ${
-                          activeTaskId === t.id
-                            ? 'border-white ring-1 ring-white/50'
-                            : 'border-[#3a3b3e]'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleTaskComplete(t.id);
-                          }}
-                          className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
-                            t.completed
-                              ? 'bg-[#38b273] border-[#38b273] text-white'
-                              : 'border-[#5e5c5a] hover:border-white'
+                    {dayTasks.map((t) => {
+                      const isMilestone = (t as any).taskType === 'milestone' || t.name.toLowerCase().includes('milestone');
+                      const isApproval = (t as any).taskType === 'approval' || t.name.toLowerCase().includes('approval');
+
+                      return (
+                        <div
+                          key={t.id}
+                          onClick={() => openTaskDrawer(t.id)}
+                          className={`bg-[#2a2b2f] hover:bg-[#333539] border text-white p-2 rounded-lg text-[12px] truncate cursor-pointer transition-colors shadow-sm flex items-center justify-between gap-2 ${
+                            activeTaskId === t.id
+                              ? 'border-white ring-1 ring-white/50'
+                              : 'border-[#3a3b3e]'
                           }`}
                         >
-                          {t.completed && <Check className="w-2 h-2 stroke-[3]" />}
-                        </button>
-                        <span
-                          className={`truncate font-medium ${
-                            t.completed ? 'line-through text-[#8a8886]' : ''
-                          }`}
-                        >
-                          {t.name}
-                        </span>
-                      </div>
-                    ))}
+                          <div className="flex items-center gap-2 truncate">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleTaskComplete(t.id);
+                              }}
+                              className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                                t.completed
+                                  ? 'bg-[#38b273] border-[#38b273] text-white'
+                                  : 'border-[#5e5c5a] hover:border-white'
+                              }`}
+                            >
+                              {t.completed && <Check className="w-2 h-2 stroke-[3]" />}
+                            </button>
+                            <span
+                              className={`truncate font-medium ${
+                                t.completed ? 'line-through text-[#8a8886]' : ''
+                              }`}
+                            >
+                              {t.name}
+                            </span>
+                          </div>
+
+                          {isMilestone && (
+                            <span className="shrink-0 text-[10px] bg-[#3e2c1c] text-[#f8be4e] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                              Milestone
+                            </span>
+                          )}
+                          {isApproval && (
+                            <span className="shrink-0 text-[10px] bg-[#1e2f47] text-[#85c5f8] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                              Approval
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Centered subtle '+ Add task' button matching Asana screenshot */}
@@ -688,9 +778,9 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
               const matching = filteredTasks.filter((t) => {
                 if (!isNov) return false;
                 const text = (t.dueDate || '').toLowerCase();
-                if (displayDay === 2 && (text.includes('today') || text.includes('nov 2'))) return true;
-                if (displayDay === 3 && text.includes('nov 3')) return true;
-                if (displayDay === 4 && text.includes('nov 4')) return true;
+                if (text.includes(`nov ${displayDay}`)) return true;
+                if (displayDay === 3 && text.includes('today')) return true;
+                if (displayDay === 2 && text.includes('yesterday')) return true;
                 return false;
               });
 

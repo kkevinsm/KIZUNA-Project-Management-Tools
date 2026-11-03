@@ -61,6 +61,7 @@ export interface Task {
   attachments: Attachment[];
   comments: Comment[];
   createdAt: string;
+  taskType?: 'task' | 'milestone' | 'approval';
 }
 
 export interface Project {

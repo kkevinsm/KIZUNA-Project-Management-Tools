@@ -149,6 +149,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
           return t;
         });
+
+        // Ensure initial sample tasks (like completed task, milestone, approval) are available for filter testing
+        const existingIds = new Set(parsedTasks.map((t) => t.id));
+        const missingInitial = INITIAL_TASKS.filter((it) => !existingIds.has(it.id));
+        if (missingInitial.length > 0) {
+          parsedTasks = [...parsedTasks, ...missingInitial];
+        }
+
         setTasks(parsedTasks);
       }
 

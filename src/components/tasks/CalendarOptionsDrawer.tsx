@@ -313,7 +313,7 @@ export default function CalendarOptionsDrawer({
               </div>
 
               {/* Filter Items Stack (Stackable) */}
-              <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4 text-[13px]">
+              <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4 text-[13px] pb-36">
                 {filters.map((filter) => {
                   return (
                     <div key={filter.id} className="space-y-1.5 group">
@@ -597,11 +597,17 @@ export default function CalendarOptionsDrawer({
                                           let next: string[];
                                           if (isSelected) {
                                             next = activeList.filter((x) => x !== opt);
+                                            if (next.length === 0) next = ['tasks'];
                                           } else {
-                                            next = [...activeList, opt];
+                                            // If only default 'tasks' was selected and clicking milestone/approval, switch to it
+                                            if (activeList.length === 1 && activeList[0] === 'tasks' && opt !== 'tasks') {
+                                              next = [opt];
+                                            } else {
+                                              next = [...activeList, opt];
+                                            }
                                           }
                                           onUpdateFilter(filter.id, {
-                                            value: next.join(',') || opt,
+                                            value: next.join(','),
                                           });
                                         }}
                                         className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-[#28292c] cursor-pointer text-[12.5px] text-white transition-colors"
