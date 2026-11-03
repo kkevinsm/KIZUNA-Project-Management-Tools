@@ -20,6 +20,14 @@ import {
   ArrowRight,
   Maximize2,
   Minimize2,
+  Zap,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  MessageSquare,
+  Sparkles,
+  Info,
+  Edit3,
 } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { useApp } from '@/context/AppContext';
@@ -66,6 +74,9 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
   // Section collapsing state
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
+  // Hide empty columns toggle state
+  const [hideAllEmptyColumns, setHideAllEmptyColumns] = useState(false);
+
   // Inline add task per column
   const [activeNewSection, setActiveNewSection] = useState<string | null>(null);
   const [newTaskName, setNewTaskName] = useState('');
@@ -78,9 +89,20 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editingSectionValue, setEditingSectionValue] = useState('');
 
-  // Section options menu
+  // Section options menu & submenu state
   const [openSectionMenu, setOpenSectionMenu] = useState<string | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<'automation' | 'add_section' | 'expand_collapse' | null>(null);
+  const [isDeleteHovered, setIsDeleteHovered] = useState(false);
   const sectionMenuRef = useRef<HTMLDivElement>(null);
+
+  // Toast message for automations and actions
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  };
 
   // Drag and Drop state
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -101,6 +123,8 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
     const handleClickOutside = (e: MouseEvent) => {
       if (sectionMenuRef.current && !sectionMenuRef.current.contains(e.target as Node)) {
         setOpenSectionMenu(null);
+        setActiveSubmenu(null);
+        setIsDeleteHovered(false);
       }
     };
     if (openSectionMenu) {
@@ -168,7 +192,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
       return;
     }
 
-    const created = createTask({
+    createTask({
       name: newTaskName.trim(),
       section,
       myTasksSection: section,
@@ -195,6 +219,28 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
     setIsAddingSection(false);
   };
 
+  // Add section to left or right of a specific index
+  const handleAddSectionAt = (targetIdx: number) => {
+    let baseName = 'New section';
+    let counter = 1;
+    let candidate = baseName;
+    while (boardSections.includes(candidate)) {
+      counter++;
+      candidate = `${baseName} ${counter}`;
+    }
+
+    const next = [...boardSections];
+    next.splice(targetIdx, 0, candidate);
+    setBoardSections(next);
+    setOpenSectionMenu(null);
+    setActiveSubmenu(null);
+    setIsDeleteHovered(false);
+
+    // Immediately start renaming the newly created section
+    setEditingSection(candidate);
+    setEditingSectionValue(candidate);
+  };
+
   // Rename section
   const handleSaveRenameSection = (oldName: string) => {
     const trimmed = editingSectionValue.trim();
@@ -214,26 +260,46 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
 
   // Delete section
   const handleDeleteSection = (sectionName: string) => {
+    if (sectionName === 'Recently assigned') return;
     if (boardSections.length <= 1) return;
+
+    // Move tasks in deleted section to 'Recently assigned'
+    tasks.forEach((t) => {
+      if (t.section === sectionName || t.myTasksSection === sectionName) {
+        updateTask(t.id, { section: 'Recently assigned', myTasksSection: 'Recently assigned' });
+      }
+    });
+
     setBoardSections((prev) => prev.filter((s) => s !== sectionName));
     setOpenSectionMenu(null);
+    setActiveSubmenu(null);
+    setIsDeleteHovered(false);
+    showToast(`Section "${sectionName}" deleted`);
   };
 
-  // Move section left / right
-  const handleMoveSection = (sectionName: string, direction: 'left' | 'right') => {
-    const idx = boardSections.indexOf(sectionName);
-    if (idx === -1) return;
-    const targetIdx = direction === 'left' ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= boardSections.length) return;
-    const next = [...boardSections];
-    const temp = next[idx];
-    next[idx] = next[targetIdx];
-    next[targetIdx] = temp;
-    setBoardSections(next);
+  // Expand all columns
+  const handleExpandAll = () => {
+    setCollapsedSections({});
     setOpenSectionMenu(null);
+    setActiveSubmenu(null);
+    setIsDeleteHovered(false);
+    showToast('All columns expanded');
   };
 
-  // Toggle collapse section
+  // Collapse all columns
+  const handleCollapseAll = () => {
+    const allCollapsed: Record<string, boolean> = {};
+    boardSections.forEach((s) => {
+      allCollapsed[s] = true;
+    });
+    setCollapsedSections(allCollapsed);
+    setOpenSectionMenu(null);
+    setActiveSubmenu(null);
+    setIsDeleteHovered(false);
+    showToast('All columns collapsed');
+  };
+
+  // Toggle collapse for single section
   const toggleCollapse = (section: string) => {
     setCollapsedSections((prev) => ({
       ...prev,
@@ -248,7 +314,13 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
     if (lower.includes('yesterday') || lower.includes('overdue')) {
       return 'text-[#ff6b72]'; // Red for overdue
     }
-    if (lower.includes('today') || lower.includes('nov 2') || lower.includes('nov 3') || lower.includes('nov 4') || lower.includes('nov 5')) {
+    if (
+      lower.includes('today') ||
+      lower.includes('nov 2') ||
+      lower.includes('nov 3') ||
+      lower.includes('nov 4') ||
+      lower.includes('nov 5')
+    ) {
       return 'text-[#4cd195]'; // Green for upcoming/today
     }
     return 'text-[#8a8886]';
@@ -287,7 +359,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
     const taskId = e.dataTransfer.getData('text/plain') || draggedTaskId;
     if (!taskId) return;
 
-    // If dropping directly onto column (not over a specific card)
     const taskIndex = tasks.findIndex((t) => t.id === taskId);
     if (taskIndex === -1) return;
 
@@ -301,7 +372,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
       myTasksSection: targetSection,
     };
 
-    // Find last index of this column
     const lastColIndex = newTasks.reduce((acc, t, idx) => {
       const tSec = t.myTasksSection || t.section || boardSections[0];
       return tSec === targetSection ? idx : acc;
@@ -365,7 +435,21 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#1e1f21] select-none text-[#f5f4f3] overflow-hidden">
+    <div className="flex-1 flex flex-col h-full bg-[#1e1f21] select-none text-[#f5f4f3] overflow-hidden relative">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-[200] bg-[#1e1f21] border border-[#383a3d] text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-[13px] animate-in fade-in slide-in-from-bottom-2">
+          <Zap className="w-4 h-4 text-[#f05542] shrink-0" />
+          <span>{toastMessage}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="ml-2 text-[#8a8886] hover:text-white transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* 1. Asana Secondary Control Toolbar for Board */}
       <div className="h-[46px] min-h-[46px] px-6 border-b border-[#262729] flex items-center justify-between text-[13px] bg-[#1e1f21] shrink-0 relative z-50">
         {/* Left Side: + Add task split button */}
@@ -547,6 +631,11 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
           const columnTasks = getSortedTasks(rawColumnTasks);
           const isDragOverThisCol = dragOverSection === section && dragOverCardId === null;
 
+          // If hideAllEmptyColumns is active and column is empty, hide it
+          if (hideAllEmptyColumns && columnTasks.length === 0) {
+            return null;
+          }
+
           // ================= COLLAPSED COLUMN =================
           if (isCollapsed) {
             return (
@@ -581,6 +670,9 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
           }
 
           // ================= EXPANDED COLUMN =================
+          const isRecentlyAssigned = section === 'Recently assigned';
+          const isNearRightEdge = sectionIdx >= boardSections.length - 2;
+
           return (
             <div
               key={section}
@@ -658,77 +750,360 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setOpenSectionMenu(openSectionMenu === section ? null : section);
+                          const nextOpen = openSectionMenu === section ? null : section;
+                          setOpenSectionMenu(nextOpen);
+                          setActiveSubmenu(null);
+                          setIsDeleteHovered(false);
                         }}
-                        className="p-1 rounded hover:bg-[#343538] hover:text-white transition-colors"
+                        className={`p-1 rounded hover:bg-[#343538] hover:text-white transition-colors ${
+                          openSectionMenu === section ? 'bg-[#343538] text-white' : ''
+                        }`}
                         title="Section actions"
                       >
                         <MoreHorizontal className="w-3.5 h-3.5" />
                       </button>
 
-                      {/* Dropdown Menu for Section */}
+                      {/* Dropdown Menu for Section Matching Asana */}
                       {openSectionMenu === section && (
                         <div
                           ref={sectionMenuRef}
-                          className="absolute right-0 top-8 w-48 bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl py-1.5 z-50 text-[12.5px] text-[#f5f4f3] animate-in fade-in duration-100"
+                          className="absolute right-0 top-8.5 w-[240px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl py-1.5 z-50 text-[13px] text-[#f5f4f3] animate-in fade-in duration-100"
                         >
+                          {/* 1. Add automation to section > */}
+                          <div
+                            className="relative"
+                            onMouseEnter={() => {
+                              setActiveSubmenu('automation');
+                              setIsDeleteHovered(false);
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className={`w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#252628] text-left transition-colors cursor-pointer group ${
+                                activeSubmenu === 'automation' ? 'bg-[#252628]' : ''
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <Zap className="w-4 h-4 text-[#f05542] shrink-0" />
+                                <span className="text-[13px] text-white">Add automation to section</span>
+                              </div>
+                              <ChevronRight className="w-3.5 h-3.5 text-[#8a8886] group-hover:text-white" />
+                            </button>
+
+                            {/* Automation Submenu (Matching Asana Screenshot 2) */}
+                            {activeSubmenu === 'automation' && (
+                              <div
+                                className={`absolute top-0 w-[280px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl py-2 z-50 text-[13px] text-[#f5f4f3] animate-in fade-in duration-100 ${
+                                  isNearRightEdge
+                                    ? 'right-[calc(100%+6px)]'
+                                    : 'left-[calc(100%+6px)]'
+                                }`}
+                              >
+                                {/* + New automation */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    showToast(`Custom automation builder opened for "${section}"`);
+                                    setOpenSectionMenu(null);
+                                    setActiveSubmenu(null);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
+                                >
+                                  <Plus className="w-4 h-4 text-[#8a8886]" />
+                                  <span className="font-medium text-[13px]">New automation</span>
+                                </button>
+
+                                <div className="border-t border-[#313235] my-1.5" />
+
+                                <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886]">
+                                  Suggested AI Studio automations
+                                </div>
+
+                                {/* Suggestion 1: Smart section sorting */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    showToast(`Smart section sorting automation enabled for "${section}"`);
+                                    setOpenSectionMenu(null);
+                                    setActiveSubmenu(null);
+                                  }}
+                                  className="w-full flex items-start gap-2.5 px-3 py-2 hover:bg-[#252628] text-left cursor-pointer group"
+                                >
+                                  <Sparkles className="w-4 h-4 text-[#8a8886] group-hover:text-white mt-0.5 shrink-0" />
+                                  <div>
+                                    <div className="font-medium text-[13px] text-white">Smart section sorting</div>
+                                    <div className="text-[11.5px] text-[#8a8886] leading-snug mt-0.5">
+                                      Automatically sort relevant tasks into this section
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {/* Suggestion 2: Automatically name tasks */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    showToast(`Automatic task naming automation enabled for "${section}"`);
+                                    setOpenSectionMenu(null);
+                                    setActiveSubmenu(null);
+                                  }}
+                                  className="w-full flex items-start gap-2.5 px-3 py-2 hover:bg-[#252628] text-left cursor-pointer group"
+                                >
+                                  <Edit3 className="w-4 h-4 text-[#8a8886] group-hover:text-white mt-0.5 shrink-0" />
+                                  <div>
+                                    <div className="font-medium text-[13px] text-white">Automatically name tasks</div>
+                                    <div className="text-[11.5px] text-[#8a8886] leading-snug mt-0.5">
+                                      Ensures consistent naming for tasks in this section
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {/* Suggestion 3: Summarize work that's been done */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    showToast(`Summary automation enabled for "${section}"`);
+                                    setOpenSectionMenu(null);
+                                    setActiveSubmenu(null);
+                                  }}
+                                  className="w-full flex items-start gap-2.5 px-3 py-2 hover:bg-[#252628] text-left cursor-pointer group"
+                                >
+                                  <MessageSquare className="w-4 h-4 text-[#8a8886] group-hover:text-white mt-0.5 shrink-0" />
+                                  <div>
+                                    <div className="font-medium text-[13px] text-white">Summarize work that&apos;s been done</div>
+                                    <div className="text-[11.5px] text-[#8a8886] leading-snug mt-0.5">
+                                      Writes a summary of work done so far as a comment when the task moves to this section
+                                    </div>
+                                  </div>
+                                </button>
+
+                                <div className="border-t border-[#313235] my-1.5" />
+
+                                {/* Info Footer */}
+                                <div className="px-3 py-1 flex items-start gap-2 text-[11px] text-[#8a8886]">
+                                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#8a8886]" />
+                                  <span className="leading-snug">
+                                    New automations will only run for new tasks added to this project
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 2. Rename section */}
                           <button
                             type="button"
+                            onMouseEnter={() => {
+                              setActiveSubmenu(null);
+                              setIsDeleteHovered(false);
+                            }}
                             onClick={() => {
                               setEditingSection(section);
                               setEditingSectionValue(section);
                               setOpenSectionMenu(null);
+                              setActiveSubmenu(null);
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
                           >
-                            <Edit2 className="w-3.5 h-3.5 text-[#8a8886]" />
-                            <span>Rename section</span>
+                            <Edit2 className="w-4 h-4 text-[#8a8886]" />
+                            <span className="text-[13px]">Rename section</span>
                           </button>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsAddingSection(true);
-                              setOpenSectionMenu(null);
+                          {/* 3. Add section > (Matching Asana Screenshot 3) */}
+                          <div
+                            className="relative"
+                            onMouseEnter={() => {
+                              setActiveSubmenu('add_section');
+                              setIsDeleteHovered(false);
                             }}
-                            className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
                           >
-                            <Plus className="w-3.5 h-3.5 text-[#8a8886]" />
-                            <span>Add section</span>
-                          </button>
-
-                          {sectionIdx > 0 && (
                             <button
                               type="button"
-                              onClick={() => handleMoveSection(section, 'left')}
-                              className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
+                              className={`w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#252628] text-left transition-colors cursor-pointer group ${
+                                activeSubmenu === 'add_section' ? 'bg-[#252628]' : ''
+                              }`}
                             >
-                              <ArrowLeft className="w-3.5 h-3.5 text-[#8a8886]" />
-                              <span>Move left</span>
+                              <div className="flex items-center gap-2.5">
+                                {/* 3 lines section icon */}
+                                <svg
+                                  className="w-4 h-4 text-[#8a8886] group-hover:text-white shrink-0"
+                                  viewBox="0 0 16 16"
+                                  fill="currentColor"
+                                >
+                                  <rect x="2" y="3.5" width="12" height="1.5" rx="0.75" />
+                                  <rect x="2" y="7.25" width="8" height="1.5" rx="0.75" />
+                                  <rect x="2" y="11" width="12" height="1.5" rx="0.75" />
+                                </svg>
+                                <span className="text-[13px] text-white">Add section</span>
+                              </div>
+                              <ChevronRight className="w-3.5 h-3.5 text-[#8a8886] group-hover:text-white" />
                             </button>
-                          )}
 
-                          {sectionIdx < boardSections.length - 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleMoveSection(section, 'right')}
-                              className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
-                            >
-                              <ArrowRight className="w-3.5 h-3.5 text-[#8a8886]" />
-                              <span>Move right</span>
-                            </button>
-                          )}
+                            {/* Add section submenu */}
+                            {activeSubmenu === 'add_section' && (
+                              <div
+                                className={`absolute top-0 w-[200px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl py-1.5 z-50 text-[13px] text-[#f5f4f3] animate-in fade-in duration-100 ${
+                                  isNearRightEdge
+                                    ? 'right-[calc(100%+6px)]'
+                                    : 'left-[calc(100%+6px)]'
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddSectionAt(sectionIdx)}
+                                  className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
+                                >
+                                  <ArrowLeft className="w-4 h-4 text-[#8a8886]" />
+                                  <span>Add section to left</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddSectionAt(sectionIdx + 1)}
+                                  className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
+                                >
+                                  <ArrowRight className="w-4 h-4 text-[#8a8886]" />
+                                  <span>Add section to right</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
 
+                          {/* Divider */}
                           <div className="border-t border-[#313235] my-1" />
 
+                          {/* 4. Expand or collapse columns > (Matching Asana Screenshot 4) */}
+                          <div
+                            className="relative"
+                            onMouseEnter={() => {
+                              setActiveSubmenu('expand_collapse');
+                              setIsDeleteHovered(false);
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className={`w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#252628] text-left transition-colors cursor-pointer group ${
+                                activeSubmenu === 'expand_collapse' ? 'bg-[#252628]' : ''
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                {/* Columns split icon */}
+                                <svg
+                                  className="w-4 h-4 text-[#8a8886] group-hover:text-white shrink-0"
+                                  viewBox="0 0 16 16"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.6"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <rect x="2" y="2.5" width="12" height="11" rx="2" />
+                                  <line x1="6.5" y1="2.5" x2="6.5" y2="13.5" />
+                                  <line x1="10" y1="2.5" x2="10" y2="13.5" />
+                                </svg>
+                                <span className="text-[13px] text-white">Expand or collapse columns</span>
+                              </div>
+                              <ChevronRight className="w-3.5 h-3.5 text-[#8a8886] group-hover:text-white" />
+                            </button>
+
+                            {/* Expand / collapse submenu */}
+                            {activeSubmenu === 'expand_collapse' && (
+                              <div
+                                className={`absolute top-0 w-[160px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl py-1.5 z-50 text-[13px] text-[#f5f4f3] animate-in fade-in duration-100 ${
+                                  isNearRightEdge
+                                    ? 'right-[calc(100%+6px)]'
+                                    : 'left-[calc(100%+6px)]'
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={handleExpandAll}
+                                  className="w-full px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
+                                >
+                                  Expand all
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCollapseAll}
+                                  className="w-full px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
+                                >
+                                  Collapse all
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 5. Hide all empty columns */}
                           <button
                             type="button"
-                            onClick={() => handleDeleteSection(section)}
-                            className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#3d1a1f] text-left text-[#ff6b72] cursor-pointer"
+                            onMouseEnter={() => {
+                              setActiveSubmenu(null);
+                              setIsDeleteHovered(false);
+                            }}
+                            onClick={() => {
+                              setHideAllEmptyColumns((prev) => !prev);
+                              setOpenSectionMenu(null);
+                              setActiveSubmenu(null);
+                              showToast(
+                                !hideAllEmptyColumns
+                                  ? 'Empty columns hidden'
+                                  : 'Showing all columns'
+                              );
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-[#ff6b72]" />
-                            <span>Delete section</span>
+                            {hideAllEmptyColumns ? (
+                              <>
+                                <Eye className="w-4 h-4 text-[#8a8886]" />
+                                <span>Show all empty columns</span>
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff className="w-4 h-4 text-[#8a8886]" />
+                                <span>Hide all empty columns</span>
+                              </>
+                            )}
                           </button>
+
+                          {/* Divider */}
+                          <div className="border-t border-[#313235] my-1" />
+
+                          {/* 6. Delete section (Matching Asana Screenshot 5) */}
+                          <div
+                            className="relative"
+                            onMouseEnter={() => {
+                              setActiveSubmenu(null);
+                              if (isRecentlyAssigned) setIsDeleteHovered(true);
+                            }}
+                            onMouseLeave={() => setIsDeleteHovered(false)}
+                          >
+                            {isRecentlyAssigned ? (
+                              /* Disabled Delete option for Recently assigned */
+                              <div className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#555659] cursor-not-allowed select-none">
+                                <Trash2 className="w-4 h-4 text-[#555659]" />
+                                <span>Delete section</span>
+                              </div>
+                            ) : (
+                              /* Enabled Delete option */
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSection(section)}
+                                className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#3d1a1f] text-left text-[#ff6b72] cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4 text-[#ff6b72]" />
+                                <span>Delete section</span>
+                              </button>
+                            )}
+
+                            {/* Tooltip when Delete is disabled (Matching Asana Screenshot 5) */}
+                            {isRecentlyAssigned && isDeleteHovered && (
+                              <div className="absolute top-[calc(100%+6px)] right-0 w-[230px] bg-[#2a2b2e] border border-[#3e4044] text-[#cfcecd] text-[12px] px-3 py-2 rounded-xl shadow-2xl pointer-events-none z-[100] animate-in fade-in duration-100">
+                                {/* Arrow pointing up */}
+                                <div className="absolute -top-[6px] right-6 w-0 h-0 border-x-[6px] border-x-transparent border-b-[6px] border-b-[#2a2b2e]" />
+                                <span className="leading-snug block">
+                                  This section can&apos;t be deleted because new tasks assigned to you appear here
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
