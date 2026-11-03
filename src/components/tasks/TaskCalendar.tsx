@@ -401,6 +401,7 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
         <div className="flex items-center gap-3">
           {/* Blue + Add task split button */}
           <AddTaskSplitButton
+            canAddSection={false}
             onAddTask={(type) => {
               const defaultName = type === 'milestone' ? 'New milestone' : type === 'approval' ? 'New approval' : 'New task';
               const created = createTask({
@@ -413,17 +414,6 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
               });
               if (created?.id) {
                 openTaskDrawer(created.id);
-              }
-            }}
-            onAddSection={() => {
-              const secName = prompt('Enter new section name:');
-              if (secName && secName.trim()) {
-                createTask({
-                  name: `Task in ${secName.trim()}`,
-                  dueDate: 'Today – Nov 3',
-                  section: secName.trim(),
-                  projectId: 'kevins-first-project',
-                });
               }
             }}
           />

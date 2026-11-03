@@ -82,6 +82,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
       <div className="h-[46px] min-h-[46px] px-6 border-b border-[#262729] flex items-center justify-between text-[13px] bg-[#1e1f21] shrink-0">
         <div className="flex items-center gap-3">
           <AddTaskSplitButton
+            canAddSection={true}
             onAddTask={(type) => {
               const defaultName = type === 'milestone' ? 'New milestone' : type === 'approval' ? 'New approval' : 'New task';
               const targetSection = boardSections[0] || 'Recently assigned';

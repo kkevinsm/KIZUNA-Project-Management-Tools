@@ -12,21 +12,25 @@ import {
 interface AddTaskSplitButtonProps {
   onAddTask: (type: 'task' | 'milestone' | 'approval') => void;
   onAddSection?: () => void;
+  canAddSection?: boolean;
   className?: string;
 }
 
 export default function AddTaskSplitButton({
   onAddTask,
   onAddSection,
+  canAddSection = false,
   className = '',
 }: AddTaskSplitButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isSectionHovered, setIsSectionHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
+        setIsSectionHovered(false);
       }
     };
 
@@ -41,15 +45,18 @@ export default function AddTaskSplitButton({
   const handleSelect = (type: 'task' | 'milestone' | 'approval') => {
     onAddTask(type);
     setIsOpen(false);
+    setIsSectionHovered(false);
   };
 
   const handleSectionSelect = () => {
+    if (!canAddSection) return;
     onAddSection?.();
     setIsOpen(false);
+    setIsSectionHovered(false);
   };
 
   return (
-    <div ref={containerRef} className={`relative inline-flex items-stretch h-7 rounded-lg overflow-visible select-none ${className}`}>
+    <div ref={containerRef} className={`relative inline-flex items-stretch h-7 rounded-lg select-none ${className}`}>
       {/* Split button main action */}
       <div className="inline-flex items-stretch h-full rounded-lg overflow-hidden shadow-xs bg-[#4573d2]">
         <button
@@ -80,7 +87,7 @@ export default function AddTaskSplitButton({
           <button
             type="button"
             onClick={() => handleSelect('task')}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-white hover:bg-[#252628] transition-colors group"
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-white hover:bg-[#252628] transition-colors group cursor-pointer"
           >
             <CheckCircle2 className="w-4 h-4 text-[#8a8886] group-hover:text-white transition-colors" />
             <span className="font-medium text-[13px]">Task</span>
@@ -93,7 +100,7 @@ export default function AddTaskSplitButton({
           <button
             type="button"
             onClick={() => handleSelect('approval')}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-white hover:bg-[#252628] transition-colors group"
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-white hover:bg-[#252628] transition-colors group cursor-pointer"
           >
             <UserCheck className="w-4 h-4 text-[#8a8886] group-hover:text-white transition-colors" />
             <span className="font-medium text-[13px]">Approval</span>
@@ -103,28 +110,65 @@ export default function AddTaskSplitButton({
           <button
             type="button"
             onClick={() => handleSelect('milestone')}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-white hover:bg-[#252628] transition-colors group"
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-white hover:bg-[#252628] transition-colors group cursor-pointer"
           >
             <Diamond className="w-4 h-4 text-[#8a8886] group-hover:text-[#f8be4e] transition-colors" />
             <span className="font-medium text-[13px]">Milestone</span>
             <div className="ml-auto flex items-center gap-1 text-[11px] text-[#8a8886] font-medium">
-              <kbd className="bg-[#2a2b2e] px-1.5 py-0.5 rounded text-[10.5px] font-sans">⇧</kbd>
-              <kbd className="bg-[#2a2b2e] px-1.5 py-0.5 rounded text-[10.5px] font-sans">Tab</kbd>
-              <kbd className="bg-[#2a2b2e] px-1.5 py-0.5 rounded text-[10.5px] font-sans">M</kbd>
+              <kbd className="bg-[#2a2b2e] text-[#a2a09d] px-1.5 py-0.5 rounded text-[10.5px] font-sans">⇧</kbd>
+              <kbd className="bg-[#2a2b2e] text-[#a2a09d] px-1.5 py-0.5 rounded text-[10.5px] font-sans">Tab</kbd>
+              <kbd className="bg-[#2a2b2e] text-[#a2a09d] px-1.5 py-0.5 rounded text-[10.5px] font-sans">M</kbd>
             </div>
           </button>
 
           {/* Divider */}
           <div className="border-t border-[#313235] my-1" />
 
-          {/* Section */}
-          <button
-            type="button"
-            onClick={handleSectionSelect}
-            className="w-full flex items-center px-3 py-1.5 text-left text-[#8a8886] hover:text-white hover:bg-[#252628] transition-colors"
+          {/* Section Row */}
+          <div
+            className="relative"
+            onMouseEnter={() => setIsSectionHovered(true)}
+            onMouseLeave={() => setIsSectionHovered(false)}
           >
-            <span className="font-medium text-[13px] pl-6.5">Section</span>
-          </button>
+            {canAddSection ? (
+              /* Enabled Section Item (in Board) */
+              <button
+                type="button"
+                onClick={handleSectionSelect}
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-white hover:bg-[#252628] transition-colors group cursor-pointer"
+              >
+                {/* 3-line section icon */}
+                <svg
+                  className="w-4 h-4 text-[#8a8886] group-hover:text-white transition-colors shrink-0"
+                  viewBox="0 0 16 16"
+                  fill="currentColor"
+                >
+                  <rect x="2" y="3.5" width="12" height="1.5" rx="0.75" />
+                  <rect x="2" y="7.25" width="8" height="1.5" rx="0.75" />
+                  <rect x="2" y="11" width="12" height="1.5" rx="0.75" />
+                </svg>
+                <span className="font-medium text-[13px]">Section</span>
+                <div className="ml-auto flex items-center gap-1 text-[11px] text-[#8a8886] font-medium">
+                  <kbd className="bg-[#2a2b2e] text-[#a2a09d] px-1.5 py-0.5 rounded text-[10.5px] font-sans">Tab</kbd>
+                  <kbd className="bg-[#2a2b2e] text-[#a2a09d] px-1.5 py-0.5 rounded text-[10.5px] font-sans">N</kbd>
+                </div>
+              </button>
+            ) : (
+              /* Disabled Section Item (in List and Calendar) */
+              <div className="w-full flex items-center px-3 py-1.5 text-[#555659] cursor-not-allowed select-none">
+                <span className="font-medium text-[13px] pl-6.5">Section</span>
+              </div>
+            )}
+
+            {/* Asana Tooltip: Cannot add section here (When hovered on disabled Section) */}
+            {!canAddSection && isSectionHovered && (
+              <div className="absolute right-[calc(100%+10px)] top-1/2 -translate-y-1/2 bg-[#2a2b2e] border border-[#3e4044] text-white text-[12px] font-normal px-3 py-1.5 rounded-lg shadow-2xl whitespace-nowrap pointer-events-none z-50 animate-in fade-in duration-100 flex items-center">
+                <span>Cannot add section here</span>
+                {/* Right pointing arrow */}
+                <div className="absolute -right-[6px] top-1/2 -translate-y-1/2 w-0 h-0 border-y-[6px] border-y-transparent border-l-[6px] border-l-[#2a2b2e]" />
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

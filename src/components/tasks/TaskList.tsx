@@ -431,6 +431,7 @@ export default function TaskList({
       <div className="h-[44px] min-h-[44px] px-6 border-b border-[#2b2c2e] flex items-center justify-between text-[13px] relative z-20">
         {/* Add task split button */}
         <AddTaskSplitButton
+          canAddSection={false}
           onAddTask={(type) => {
             const defaultName = type === 'milestone' ? 'New milestone' : type === 'approval' ? 'New approval' : 'New task';
             const created = createTask({
@@ -445,10 +446,6 @@ export default function TaskList({
             if (created?.id) {
               openTaskDrawer(created.id);
             }
-          }}
-          onAddSection={() => {
-            setGroupField('section');
-            setIsAddingSection(true);
           }}
         />
 
