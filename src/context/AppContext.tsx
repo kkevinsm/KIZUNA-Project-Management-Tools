@@ -45,6 +45,8 @@ interface AppContextType {
   createTask: (data: {
     name: string;
     section?: string;
+    myTasksSection?: string;
+    taskType?: 'task' | 'milestone' | 'approval';
     projectId?: string;
     assignee?: Assignee;
     dueDate?: string;
@@ -410,6 +412,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const createTask = ({
     name,
     section = 'To do',
+    myTasksSection,
+    taskType = 'task',
     projectId = 'kevins-first-project',
     assignee,
     dueDate = 'Today – Nov 4',
@@ -419,6 +423,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }: {
     name: string;
     section?: string;
+    myTasksSection?: string;
+    taskType?: 'task' | 'milestone' | 'approval';
     projectId?: string;
     assignee?: Assignee;
     dueDate?: string;
@@ -438,6 +444,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       name: name.trim() || 'New task',
       completed: false,
       section,
+      myTasksSection: myTasksSection || (section && ['Recently assigned', 'Do today', 'Do next week', 'Do later'].includes(section) ? section : 'Recently assigned'),
+      taskType,
       projectId,
       projectName: project ? project.name : "Kevin's first project",
       assignee: taskAssignee,

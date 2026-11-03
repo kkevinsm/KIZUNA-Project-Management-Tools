@@ -48,6 +48,7 @@ export interface Task {
   name: string;
   completed: boolean;
   section: string; // e.g. "To do", "Doing", "Done", "Recently assigned", "Do today", "Do next week", "Do later"
+  myTasksSection?: string; // 'Recently assigned' | 'Do today' | 'Do next week' | 'Do later'
   projectId?: string;
   projectName?: string;
   assignee: Assignee;

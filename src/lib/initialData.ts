@@ -42,6 +42,7 @@ export const INITIAL_TASKS: Task[] = [
     completed: false,
     taskType: 'task',
     section: 'To do',
+    myTasksSection: 'Recently assigned',
     projectId: 'kevins-first-project',
     projectName: "Kevin's first project",
     assignee: {
@@ -76,6 +77,7 @@ export const INITIAL_TASKS: Task[] = [
     completed: false,
     taskType: 'task',
     section: 'To do',
+    myTasksSection: 'Do today',
     projectId: 'kevins-first-project',
     projectName: "Kevin's first project",
     assignee: {
@@ -101,6 +103,7 @@ export const INITIAL_TASKS: Task[] = [
     completed: false,
     taskType: 'task',
     section: 'To do',
+    myTasksSection: 'Do next week',
     projectId: 'kevins-first-project',
     projectName: "Kevin's first project",
     assignee: {
@@ -124,6 +127,7 @@ export const INITIAL_TASKS: Task[] = [
     completed: true,
     taskType: 'task',
     section: 'Done',
+    myTasksSection: 'Do later',
     projectId: 'kevins-first-project',
     projectName: "Kevin's first project",
     assignee: {
@@ -147,6 +151,7 @@ export const INITIAL_TASKS: Task[] = [
     completed: false,
     taskType: 'milestone',
     section: 'To do',
+    myTasksSection: 'Do next week',
     projectId: 'kevins-first-project',
     projectName: "Kevin's first project",
     assignee: {
@@ -170,6 +175,7 @@ export const INITIAL_TASKS: Task[] = [
     completed: false,
     taskType: 'approval',
     section: 'Doing',
+    myTasksSection: 'Do today',
     projectId: 'kevins-first-project',
     projectName: "Kevin's first project",
     assignee: {
