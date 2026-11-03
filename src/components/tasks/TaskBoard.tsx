@@ -37,11 +37,13 @@ import {
   ArrowUp,
   ArrowDown,
   User,
+  Tag,
+  CheckCircle2,
 } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { useApp } from '@/context/AppContext';
 import AddTaskSplitButton from '@/components/tasks/AddTaskSplitButton';
-import ListOptionsDrawer from '@/components/tasks/ListOptionsDrawer';
+import BoardOptionsDrawer from '@/components/tasks/BoardOptionsDrawer';
 import FilterPopoverContent, { FilterRule, evaluateTaskFilters } from '@/components/tasks/FilterPopoverContent';
 
 interface TaskBoardProps {
@@ -171,9 +173,17 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
     dueDate: true,
     project: true,
     collaborators: false,
-    priority: true,
-    status: false,
+    visibility: false,
+    tags: false,
+    taskType: true,
+    createdBy: false,
+    createdOn: false,
+    lastModifiedOn: false,
+    completedOn: false,
   });
+  const [cardSize, setCardSize] = useState<'default' | 'compact'>('default');
+  const [showCoverImages, setShowCoverImages] = useState(false);
+  const [showSubtasks, setShowSubtasks] = useState(true);
 
   // ================= 5. SEARCH STATE =================
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -1650,7 +1660,9 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                         onDrop={(e) => handleDropOnCard(e, task.id, section)}
                         onDragEnd={handleDragEnd}
                         onClick={() => openTaskDrawer(task.id)}
-                        className={`bg-[#252628] hover:bg-[#2b2c2f] border border-[#323438] hover:border-[#45474c] rounded-xl p-3.5 cursor-grab active:cursor-grabbing transition-all shadow-sm select-none relative group ${
+                        className={`bg-[#252628] hover:bg-[#2b2c2f] border border-[#323438] hover:border-[#45474c] rounded-xl cursor-grab active:cursor-grabbing transition-all shadow-sm select-none relative group ${
+                          cardSize === 'compact' ? 'p-2.5' : 'p-3.5'
+                        } ${
                           isDragging ? 'opacity-30 scale-[0.98]' : 'opacity-100'
                         } ${task.completed ? 'opacity-60' : ''}`}
                       >
@@ -1685,16 +1697,20 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                             </span>
 
                             {/* Milestone / Approval badge */}
-                            {isMilestone && (
-                              <span className="self-start text-[10px] bg-[#3e2c1c] text-[#f8be4e] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1">
-                                <span>◆</span>
-                                <span>Milestone</span>
-                              </span>
-                            )}
-                            {isApproval && (
-                              <span className="self-start text-[10px] bg-[#1e2f47] text-[#85c5f8] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                                Approval
-                              </span>
+                            {boardVisibleFields.taskType !== false && (
+                              <>
+                                {isMilestone && (
+                                  <span className="self-start text-[10px] bg-[#3e2c1c] text-[#f8be4e] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1">
+                                    <span>◆</span>
+                                    <span>Milestone</span>
+                                  </span>
+                                )}
+                                {isApproval && (
+                                  <span className="self-start text-[10px] bg-[#1e2f47] text-[#85c5f8] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                                    Approval
+                                  </span>
+                                )}
+                              </>
                             )}
                           </div>
                         </div>
@@ -1719,6 +1735,58 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                             >
                               {task.dueDate}
                             </span>
+                          </div>
+                        )}
+
+                        {/* 4. Collaborators */}
+                        {boardVisibleFields.collaborators && (
+                          <div className="mt-2 flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-full bg-[#4573d2] text-white flex items-center justify-center text-[10px] font-semibold">
+                              KS
+                            </div>
+                            <span className="text-[11px] text-[#8a8886]">Kevin S</span>
+                          </div>
+                        )}
+
+                        {/* 5. Task visibility */}
+                        {boardVisibleFields.visibility && (
+                          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-[#8a8886]">
+                            <Eye className="w-3.5 h-3.5 text-[#8a8886]" />
+                            <span>My workspace</span>
+                          </div>
+                        )}
+
+                        {/* 6. Tags */}
+                        {boardVisibleFields.tags && (
+                          <div className="mt-2 flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-[#2a2b2e] text-[10px] text-[#cfcecd] font-medium flex items-center gap-1">
+                              <Tag className="w-3 h-3 text-[#8a8886]" />
+                              <span>Task</span>
+                            </span>
+                          </div>
+                        )}
+
+                        {/* 7. Created by */}
+                        {boardVisibleFields.createdBy && (
+                          <div className="mt-1.5 text-[10px] text-[#8a8886] flex items-center gap-1">
+                            <User className="w-3 h-3" />
+                            <span>Created by Kevin S</span>
+                          </div>
+                        )}
+
+                        {/* 8. Created on */}
+                        {boardVisibleFields.createdOn && (
+                          <div className="mt-1.5 text-[10px] text-[#8a8886] flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            <span>Created Nov 3</span>
+                          </div>
+                        )}
+
+                        {/* 9. Completed on */}
+                        {boardVisibleFields.completedOn && task.completed && (
+                          <div className="mt-1.5 text-[10px] text-[#38b273] flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Completed Nov 3</span>
                           </div>
                         )}
                       </div>
@@ -1826,7 +1894,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
       </div>
 
       {/* Options Drawer for Board View */}
-      <ListOptionsDrawer
+      <BoardOptionsDrawer
         isOpen={isListOptionsDrawerOpen}
         onClose={() => setIsListOptionsDrawerOpen(false)}
         columns={boardVisibleFields}
@@ -1842,6 +1910,12 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
         onSortFieldChange={(sf) => setSortField(sf)}
         groupField={groupField}
         onGroupFieldChange={(gf) => setGroupField(gf)}
+        cardSize={cardSize}
+        onCardSizeChange={(size) => setCardSize(size)}
+        showCoverImages={showCoverImages}
+        onToggleCoverImages={() => setShowCoverImages((v) => !v)}
+        showSubtasks={showSubtasks}
+        onToggleSubtasks={() => setShowSubtasks((v) => !v)}
       />
     </div>
   );
