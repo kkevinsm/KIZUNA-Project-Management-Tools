@@ -162,10 +162,10 @@ export default function AddTaskSplitButton({
 
             {/* Asana Tooltip: Cannot add section here (When hovered on disabled Section) */}
             {!canAddSection && isSectionHovered && (
-              <div className="absolute right-[calc(100%+10px)] top-1/2 -translate-y-1/2 bg-[#2a2b2e] border border-[#3e4044] text-white text-[12px] font-normal px-3 py-1.5 rounded-lg shadow-2xl whitespace-nowrap pointer-events-none z-50 animate-in fade-in duration-100 flex items-center">
+              <div className="absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 bg-[#2a2b2e] border border-[#3e4044] text-white text-[12px] font-normal px-3 py-1.5 rounded-lg shadow-2xl whitespace-nowrap pointer-events-none z-[100] animate-in fade-in duration-100 flex items-center">
+                {/* Left pointing arrow */}
+                <div className="absolute -left-[6px] top-1/2 -translate-y-1/2 w-0 h-0 border-y-[6px] border-y-transparent border-r-[6px] border-r-[#2a2b2e]" />
                 <span>Cannot add section here</span>
-                {/* Right pointing arrow */}
-                <div className="absolute -right-[6px] top-1/2 -translate-y-1/2 w-0 h-0 border-y-[6px] border-y-transparent border-l-[6px] border-l-[#2a2b2e]" />
               </div>
             )}
           </div>

@@ -428,7 +428,7 @@ export default function TaskList({
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1e1f21] select-none relative overflow-hidden">
       {/* Action Toolbar for List View */}
-      <div className="h-[44px] min-h-[44px] px-6 border-b border-[#2b2c2e] flex items-center justify-between text-[13px] relative z-20">
+      <div className="h-[44px] min-h-[44px] px-6 border-b border-[#2b2c2e] flex items-center justify-between text-[13px] relative z-50 bg-[#1e1f21]">
         {/* Add task split button */}
         <AddTaskSplitButton
           canAddSection={false}
@@ -1070,7 +1070,7 @@ export default function TaskList({
           {/* Table Header */}
           <div className="flex items-center h-[34px] border-b border-[#262729] text-[#8a8886] font-semibold text-[11px] select-none bg-[#1e1f21] sticky top-0 z-30">
             {/* Sticky Name Column Header */}
-            <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-40 bg-[#1e1f21] px-3 flex items-center h-full">
+            <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-35 bg-[#1e1f21] px-3 flex items-center h-full">
               <div
                 className="w-[24px] flex items-center justify-center shrink-0 cursor-pointer"
                 onClick={handleSelectAllVisible}

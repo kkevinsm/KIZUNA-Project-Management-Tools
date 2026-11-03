@@ -396,7 +396,7 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1e1f21] select-none text-[#f5f4f3] overflow-hidden">
       {/* 1. Asana Secondary Control Toolbar */}
-      <div className="h-[46px] min-h-[46px] px-6 border-b border-[#262729] flex items-center justify-between text-[13px] bg-[#1e1f21]">
+      <div className="h-[46px] min-h-[46px] px-6 border-b border-[#262729] flex items-center justify-between text-[13px] bg-[#1e1f21] relative z-50">
         {/* Left Side: + Add task split button & Date Navigation */}
         <div className="flex items-center gap-3">
           {/* Blue + Add task split button */}

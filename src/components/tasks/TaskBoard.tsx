@@ -79,7 +79,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1e1f21] select-none text-[#f5f4f3] overflow-hidden">
       {/* 1. Asana Secondary Control Toolbar for Board */}
-      <div className="h-[46px] min-h-[46px] px-6 border-b border-[#262729] flex items-center justify-between text-[13px] bg-[#1e1f21] shrink-0">
+      <div className="h-[46px] min-h-[46px] px-6 border-b border-[#262729] flex items-center justify-between text-[13px] bg-[#1e1f21] shrink-0 relative z-50">
         <div className="flex items-center gap-3">
           <AddTaskSplitButton
             canAddSection={true}
