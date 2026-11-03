@@ -121,17 +121,21 @@ export default function MyTasksPage() {
       {activeTab === 'List' && (
         <div className="h-[44px] min-h-[44px] px-6 border-b border-[#2b2c2e] flex items-center justify-between text-[13px]">
           {/* Add task split button */}
-          <div className="flex items-center">
+          <div className="inline-flex items-stretch h-7 rounded-lg overflow-hidden shadow-xs bg-[#4573d2]">
             <button
+              type="button"
               onClick={() => openCreateModal('task')}
-              className="flex items-center gap-1.5 bg-[#4573d2] hover:bg-[#3562be] text-white px-3 py-1.5 rounded-l-lg font-medium text-[12px] transition-colors shadow-sm"
+              className="flex items-center gap-1.5 bg-[#4573d2] hover:bg-[#3562be] text-white px-2.5 font-medium text-[12.5px] transition-colors h-full"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Add task</span>
             </button>
+            <div className="w-px bg-white/20 h-full" />
             <button
+              type="button"
               onClick={() => openCreateModal('task')}
-              className="bg-[#4573d2] hover:bg-[#3562be] text-white px-1.5 py-1.5 rounded-r-lg border-l border-[#3562be] text-[12px] transition-colors"
+              className="flex items-center justify-center bg-[#4573d2] hover:bg-[#3562be] text-white px-1.5 transition-colors h-full"
+              title="More options"
             >
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
