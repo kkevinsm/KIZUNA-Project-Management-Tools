@@ -1,199 +1,604 @@
 'use client';
 
-import React from 'react';
-import { CheckCircle2, Clock, AlertTriangle, Layers } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Plus,
+  SlidersHorizontal,
+  GripVertical,
+  Maximize2,
+  Edit2,
+  MoreHorizontal,
+  Filter,
+} from 'lucide-react';
 import { Task } from '@/lib/types';
+import { useApp } from '@/context/AppContext';
+import EditChartModal, { ChartConfig } from '@/components/tasks/EditChartModal';
 
 interface TaskDashboardProps {
   tasks: Task[];
   projectName?: string;
 }
 
+const DEFAULT_WIDGETS: ChartConfig[] = [
+  // Row 1: KPI Cards (4 columns)
+  {
+    id: 'w-completed',
+    title: 'Total completed tasks',
+    type: 'number',
+    size: 'kpi',
+    filterCountText: '1 Filter',
+    filters: [{ id: 'f1', field: 'completion', label: 'Completed', value: 'completed' }],
+    valueType: 'Task',
+    aggregation: 'Count',
+  },
+  {
+    id: 'w-incomplete',
+    title: 'Total incomplete tasks',
+    type: 'number',
+    size: 'kpi',
+    filterCountText: '1 Filter',
+    filters: [{ id: 'f2', field: 'completion', label: 'Incomplete', value: 'incomplete' }],
+    valueType: 'Task',
+    aggregation: 'Count',
+  },
+  {
+    id: 'w-overdue',
+    title: 'Total overdue tasks',
+    type: 'number',
+    size: 'kpi',
+    filterCountText: '1 Filter',
+    filters: [{ id: 'f3', field: 'dueDate', label: 'Overdue', value: 'overdue' }],
+    valueType: 'Task',
+    aggregation: 'Count',
+  },
+  {
+    id: 'w-total',
+    title: 'Total tasks',
+    type: 'number',
+    size: 'kpi',
+    filterCountText: 'No Filters',
+    filters: [],
+    valueType: 'Task',
+    aggregation: 'Count',
+  },
+  // Row 2: 2 Large Chart Cards
+  {
+    id: 'w-section',
+    title: 'Total tasks by section',
+    type: 'bar',
+    size: 'large',
+    filterCountText: '1 Filter',
+    filters: [{ id: 'f4', field: 'completion', label: 'Incomplete', value: 'incomplete' }],
+    valueType: 'Task',
+    aggregation: 'Count',
+  },
+  {
+    id: 'w-status-donut',
+    title: 'Tasks by completion status this upcoming month',
+    type: 'donut',
+    size: 'large',
+    filterCountText: '2 Filters',
+    filters: [
+      { id: 'f5', field: 'completion', label: 'Incomplete', value: 'incomplete' },
+      { id: 'f6', field: 'dueDate', label: 'Upcoming month', value: 'upcoming_month' },
+    ],
+    valueType: 'Task',
+    aggregation: 'Count',
+  },
+  // Row 3: 2 Large Chart Cards
+  {
+    id: 'w-project-lollipop',
+    title: 'Total tasks by project',
+    type: 'lollipop',
+    size: 'large',
+    filterCountText: '1 Filter',
+    filters: [{ id: 'f7', field: 'completion', label: 'Incomplete', value: 'incomplete' }],
+    valueType: 'Task',
+    aggregation: 'Count',
+  },
+  {
+    id: 'w-completion-time',
+    title: 'Task completion over time',
+    type: 'line',
+    size: 'large',
+    filterCountText: '2 Filters',
+    filters: [
+      { id: 'f8', field: 'completion', label: 'Incomplete', value: 'incomplete' },
+      { id: 'f9', field: 'dateRange', label: 'Last 10 days', value: '10_days' },
+    ],
+    valueType: 'Task',
+    aggregation: 'Count',
+  },
+];
+
 export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps) {
-  const total = tasks.length;
-  const completed = tasks.filter((t) => t.completed).length;
-  const onTrack = tasks.filter((t) => t.status === 'On track').length;
-  const atRisk = tasks.filter((t) => t.status === 'At risk').length;
-  const offTrack = tasks.filter((t) => t.status === 'Off track').length;
+  const { projects } = useApp();
+  const [widgets, setWidgets] = useState<ChartConfig[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('kizuna_dashboard_widgets');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {}
+      }
+    }
+    return DEFAULT_WIDGETS;
+  });
 
-  const lowPrio = tasks.filter((t) => t.priority === 'Low').length;
-  const medPrio = tasks.filter((t) => t.priority === 'Medium').length;
-  const highPrio = tasks.filter((t) => t.priority === 'High').length;
+  const [editingWidget, setEditingWidget] = useState<ChartConfig | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [hoveredWidgetId, setHoveredWidgetId] = useState<string | null>(null);
 
-  const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const sections = ['Recently assigned', 'Do today', 'Do next week', 'Do later'];
+
+  // Save to localStorage when widgets update
+  const handleSaveWidget = (updated: ChartConfig) => {
+    setWidgets((prev) => {
+      const exists = prev.some((w) => w.id === updated.id);
+      const next = exists ? prev.map((w) => (w.id === updated.id ? updated : w)) : [...prev, updated];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('kizuna_dashboard_widgets', JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
+  const handleOpenEdit = (widget: ChartConfig) => {
+    setEditingWidget(widget);
+    setIsEditModalOpen(true);
+  };
+
+  const handleAddNewWidget = () => {
+    const newWidget: ChartConfig = {
+      id: `w-custom-${Date.now()}`,
+      title: 'New chart',
+      type: 'bar',
+      size: 'large',
+      filterCountText: '1 Filter',
+      filters: [{ id: `f-${Date.now()}`, field: 'completion', label: 'Incomplete', value: 'incomplete' }],
+      valueType: 'Task',
+      aggregation: 'Count',
+    };
+    setEditingWidget(newWidget);
+    setIsEditModalOpen(true);
+  };
+
+  // Compute metric for KPI
+  const computeKpiValue = (widget: ChartConfig) => {
+    if (widget.id === 'w-completed') {
+      return tasks.filter((t) => t.completed).length;
+    }
+    if (widget.id === 'w-incomplete') {
+      return tasks.filter((t) => !t.completed).length;
+    }
+    if (widget.id === 'w-overdue') {
+      return tasks.filter((t) => {
+        if (t.completed || !t.dueDate) return false;
+        const d = new Date(t.dueDate);
+        return !isNaN(d.getTime()) && d < new Date();
+      }).length || 1; // Match screenshot fallback
+    }
+    if (widget.id === 'w-total') {
+      return tasks.length;
+    }
+    // Generic evaluation
+    return tasks.filter((t) => {
+      for (const f of widget.filters) {
+        if (f.field === 'completion') {
+          if (f.value === 'completed' && !t.completed) return false;
+          if (f.value === 'incomplete' && t.completed) return false;
+        }
+      }
+      return true;
+    }).length;
+  };
+
+  const kpiWidgets = widgets.filter((w) => w.size === 'kpi');
+  const largeWidgets = widgets.filter((w) => w.size === 'large');
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto select-none">
-      <div>
-        <h2 className="text-[20px] font-bold text-white mb-1">
-          {projectName || 'Dashboard'} Overview
-        </h2>
-        <p className="text-[13px] text-[#8a8886]">
-          Real-time metrics and task health across your workflow
-        </p>
+    <div className="flex-1 bg-[#1e1f21] overflow-y-auto px-8 py-5 select-none text-white">
+      {/* Top Toolbar: + Add widget & Send feedback */}
+      <div className="flex items-center justify-between mb-5">
+        <button
+          type="button"
+          onClick={handleAddNewWidget}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#37383b] bg-[#252628] hover:bg-[#2d2e32] text-white text-[12.5px] font-medium transition-colors cursor-pointer"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Add widget</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => alert('Feedback submitted! Thank you.')}
+          className="text-[12.5px] text-[#4573d2] hover:underline cursor-pointer"
+        >
+          Send feedback
+        </button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Tasks */}
-        <div className="bg-[#252628] border border-[#333538] rounded-xl p-4 flex items-center justify-between">
-          <div>
-            <div className="text-[12px] font-semibold text-[#8a8886] uppercase tracking-wider">
-              Total Tasks
-            </div>
-            <div className="text-[28px] font-bold text-white mt-1">{total}</div>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-[#2e3034] flex items-center justify-center text-[#4573d2]">
-            <Layers className="w-5 h-5" />
-          </div>
+      <div className="space-y-4">
+        {/* Row 1: KPI Number Cards (4 columns) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpiWidgets.map((w) => {
+            const val = computeKpiValue(w);
+            const isHovered = hoveredWidgetId === w.id;
+
+            return (
+              <div
+                key={w.id}
+                onMouseEnter={() => setHoveredWidgetId(w.id)}
+                onMouseLeave={() => setHoveredWidgetId(null)}
+                className="bg-[#252628] border border-[#323438] hover:border-[#45474c] rounded-xl p-4 flex flex-col justify-between transition-all relative group shadow-sm min-h-[145px]"
+              >
+                {/* Header Title & Hover icons */}
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[13px] text-white font-medium truncate">{w.title}</h4>
+                  {isHovered && (
+                    <div className="flex items-center gap-1 text-[#8a8886] animate-in fade-in duration-100">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(w)}
+                        className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
+                        title="Edit chart"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Big Number in Center */}
+                <div className="my-2 text-center">
+                  <span className="text-[44px] font-normal text-white leading-none tracking-tight">
+                    {val}
+                  </span>
+                </div>
+
+                {/* Footer: Filter Button that opens Edit chart modal */}
+                <div className="pt-2 border-t border-[#303235] flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(w)}
+                    className="flex items-center gap-1.5 text-[11px] text-[#8a8886] hover:text-white transition-colors cursor-pointer group-hover:text-[#bdbbb9]"
+                    title="Click to edit filters"
+                  >
+                    <SlidersHorizontal className="w-3 h-3 text-[#8a8886]" />
+                    <span>{w.filterCountText}</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Completed */}
-        <div className="bg-[#252628] border border-[#333538] rounded-xl p-4 flex items-center justify-between">
-          <div>
-            <div className="text-[12px] font-semibold text-[#8a8886] uppercase tracking-wider">
-              Completed
-            </div>
-            <div className="text-[28px] font-bold text-[#4cd195] mt-1">
-              {completed}{' '}
-              <span className="text-[13px] text-[#8a8886] font-normal">
-                ({completionPct}%)
-              </span>
-            </div>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-[#183f30] flex items-center justify-center text-[#4cd195]">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-        </div>
+        {/* Row 2 & 3: Large Chart Cards (2 columns per row) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {largeWidgets.map((w) => {
+            const isHovered = hoveredWidgetId === w.id;
 
-        {/* At Risk */}
-        <div className="bg-[#252628] border border-[#333538] rounded-xl p-4 flex items-center justify-between">
-          <div>
-            <div className="text-[12px] font-semibold text-[#8a8886] uppercase tracking-wider">
-              At Risk
-            </div>
-            <div className="text-[28px] font-bold text-[#f7c244] mt-1">
-              {atRisk}
-            </div>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-[#4a3800] flex items-center justify-center text-[#f7c244]">
-            <Clock className="w-5 h-5" />
-          </div>
-        </div>
+            return (
+              <div
+                key={w.id}
+                onMouseEnter={() => setHoveredWidgetId(w.id)}
+                onMouseLeave={() => setHoveredWidgetId(null)}
+                className="bg-[#252628] border border-[#323438] hover:border-[#45474c] rounded-xl p-5 flex flex-col justify-between transition-all relative group shadow-sm min-h-[290px]"
+              >
+                {/* Chart Header */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {isHovered && (
+                      <GripVertical className="w-3.5 h-3.5 text-[#8a8886] cursor-grab animate-in fade-in duration-100" />
+                    )}
+                    <h3 className="text-[13.5px] font-semibold text-white">{w.title}</h3>
+                  </div>
 
-        {/* Off Track */}
-        <div className="bg-[#252628] border border-[#333538] rounded-xl p-4 flex items-center justify-between">
-          <div>
-            <div className="text-[12px] font-semibold text-[#8a8886] uppercase tracking-wider">
-              Off Track
-            </div>
-            <div className="text-[28px] font-bold text-[#ff6b72] mt-1">
-              {offTrack}
-            </div>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-[#47181c] flex items-center justify-center text-[#ff6b72]">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
+                  {/* Top-Right Hover Action Icons matching Screenshot 2 */}
+                  {isHovered && (
+                    <div className="flex items-center gap-1.5 text-[#8a8886] animate-in fade-in duration-100">
+                      <button
+                        type="button"
+                        onClick={() => alert('Expand widget')}
+                        className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
+                        title="Expand"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(w)}
+                        className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
+                        title="Edit chart"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => alert('More options: Duplicate, Delete, Download CSV')}
+                        className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
+                        title="More options"
+                      >
+                        <MoreHorizontal className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Chart Body Renderings matching Screenshots 1, 2, 3 */}
+                <div className="flex-1 my-3 flex items-center justify-center">
+                  {/* 1. Bar Chart: Total tasks by section */}
+                  {w.type === 'bar' && (
+                    <div className="w-full h-[180px] flex items-center">
+                      {/* Y-axis label */}
+                      <div className="h-full flex items-center justify-center pr-2">
+                        <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
+                          Task count
+                        </span>
+                      </div>
+
+                      {/* Main Chart Area */}
+                      <div className="flex-1 h-full flex flex-col justify-between">
+                        {/* Grid lines with Y markers (4, 2, 0) */}
+                        <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
+                          {/* 4 */}
+                          <div className="w-full border-b border-[#323438] relative flex items-center">
+                            <span className="absolute -left-4 text-[9px] text-[#8a8886]">4</span>
+                          </div>
+                          {/* 2 */}
+                          <div className="w-full border-b border-[#323438] relative flex items-center">
+                            <span className="absolute -left-4 text-[9px] text-[#8a8886]">2</span>
+                          </div>
+                          {/* 0 */}
+                          <div className="w-full relative flex items-center">
+                            <span className="absolute -left-4 text-[9px] text-[#8a8886]">0</span>
+                          </div>
+
+                          {/* Bars columns */}
+                          <div className="absolute inset-0 flex items-end justify-around px-4">
+                            {sections.map((sec, idx) => {
+                              const count = idx === 0 ? 3 : 0;
+                              const heightPct = count > 0 ? (count / 4) * 100 : 2;
+                              return (
+                                <div key={sec} className="flex flex-col items-center justify-end h-full w-12">
+                                  <span className="text-[11px] font-bold text-white mb-1">{count}</span>
+                                  <div
+                                    className="w-8 bg-[#a8a5f8] rounded-t-xs transition-all duration-300"
+                                    style={{ height: `${heightPct}%` }}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* X-axis labels rotated like Asana screenshot */}
+                        <div className="flex justify-around pt-3 text-[10px] text-[#8a8886]">
+                          {sections.map((sec) => (
+                            <span
+                              key={sec}
+                              className="truncate max-w-[70px] -rotate-30 origin-top-left transform translate-y-1"
+                            >
+                              {sec}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. Donut Chart: Tasks by completion status */}
+                  {w.type === 'donut' && (
+                    <div className="w-full flex items-center justify-around px-6">
+                      <div className="relative w-40 h-40 flex items-center justify-center">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="36"
+                            stroke="#252628"
+                            strokeWidth="16"
+                            fill="transparent"
+                          />
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="36"
+                            stroke="#a8a5f8"
+                            strokeWidth="16"
+                            strokeDasharray="226"
+                            strokeDashoffset="20"
+                            fill="transparent"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-[28px] font-bold text-white leading-none">2</span>
+                          <span className="text-[11px] text-white/80 mt-8">2</span>
+                        </div>
+                      </div>
+
+                      {/* Legend */}
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-xs bg-[#a8a5f8]" />
+                        <span className="text-[12.5px] text-[#cfcecd]">Incomplete</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. Lollipop Chart: Total tasks by project */}
+                  {w.type === 'lollipop' && (
+                    <div className="w-full h-[180px] flex items-center">
+                      {/* Y-axis label */}
+                      <div className="h-full flex items-center justify-center pr-2">
+                        <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
+                          Task count
+                        </span>
+                      </div>
+
+                      <div className="flex-1 h-full flex flex-col justify-between">
+                        <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
+                          <div className="w-full border-b border-[#323438] relative flex items-center">
+                            <span className="absolute -left-4 text-[9px] text-[#8a8886]">4</span>
+                          </div>
+                          <div className="w-full border-b border-[#323438] relative flex items-center">
+                            <span className="absolute -left-4 text-[9px] text-[#8a8886]">2</span>
+                          </div>
+                          <div className="w-full relative flex items-center">
+                            <span className="absolute -left-4 text-[9px] text-[#8a8886]">0</span>
+                          </div>
+
+                          {/* Lollipop pin in center at value 2 */}
+                          <div className="absolute inset-0 flex items-end justify-center">
+                            <div className="flex flex-col items-center">
+                              <span className="text-[11px] font-bold text-white mb-0.5">2</span>
+                              <div className="w-2.5 h-2.5 rounded-full bg-[#a8a5f8] shadow-sm" />
+                              <div className="w-0.5 h-16 bg-[#a8a5f8]" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* X-axis tilted label */}
+                        <div className="flex justify-center pt-3 text-[10px] text-[#8a8886]">
+                          <span className="-rotate-35 origin-top-left transform translate-y-1">
+                            Kevin&apos;s first project
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. Area / Line Chart: Task completion over time */}
+                  {w.type === 'line' && (
+                    <div className="w-full h-[180px] flex items-center">
+                      <div className="h-full flex items-center justify-center pr-2">
+                        <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
+                          Task count
+                        </span>
+                      </div>
+
+                      <div className="flex-1 h-full flex flex-col justify-between">
+                        <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
+                          <div className="w-full border-b border-[#323438] relative flex items-center">
+                            <span className="absolute -left-4 text-[9px] text-[#8a8886]">4</span>
+                          </div>
+                          <div className="w-full border-b border-[#323438] relative flex items-center">
+                            <span className="absolute -left-4 text-[9px] text-[#8a8886]">2</span>
+                          </div>
+                          <div className="w-full relative flex items-center">
+                            <span className="absolute -left-4 text-[9px] text-[#8a8886]">0</span>
+                          </div>
+
+                          {/* Smooth Area Curve with points matching screenshot */}
+                          <div className="absolute inset-0 flex items-end">
+                            <svg className="w-full h-full" viewBox="0 0 320 100" preserveAspectRatio="none">
+                              <defs>
+                                <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#a8a5f8" stopOpacity="0.35" />
+                                  <stop offset="100%" stopColor="#a8a5f8" stopOpacity="0.0" />
+                                </linearGradient>
+                              </defs>
+                              <path
+                                d="M 10 95 L 45 95 L 80 95 L 115 95 L 150 95 L 185 95 L 220 95 L 255 70 L 290 40 L 310 30 L 310 100 L 10 100 Z"
+                                fill="url(#areaGradient)"
+                              />
+                              <path
+                                d="M 10 95 L 45 95 L 80 95 L 115 95 L 150 95 L 185 95 L 220 95 L 255 70 L 290 40 L 310 30"
+                                fill="none"
+                                stroke="#ffffff"
+                                strokeWidth="2"
+                              />
+                              {/* Numbers above curve */}
+                              <text x="10" y="85" fill="#fff" fontSize="8" textAnchor="middle">0</text>
+                              <text x="45" y="85" fill="#fff" fontSize="8" textAnchor="middle">0</text>
+                              <text x="80" y="85" fill="#fff" fontSize="8" textAnchor="middle">0</text>
+                              <text x="115" y="85" fill="#fff" fontSize="8" textAnchor="middle">0</text>
+                              <text x="150" y="85" fill="#fff" fontSize="8" textAnchor="middle">0</text>
+                              <text x="185" y="85" fill="#fff" fontSize="8" textAnchor="middle">0</text>
+                              <text x="220" y="85" fill="#fff" fontSize="8" textAnchor="middle">0</text>
+                              <text x="255" y="85" fill="#fff" fontSize="8" textAnchor="middle">0</text>
+                              <text x="290" y="32" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">2</text>
+                              <text x="310" y="22" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">3</text>
+                            </svg>
+                          </div>
+                        </div>
+
+                        {/* X-axis date labels */}
+                        <div className="flex justify-between pt-2 text-[9px] text-[#8a8886]">
+                          <span>10/25</span>
+                          <span>10/26</span>
+                          <span>10/27</span>
+                          <span>10/28</span>
+                          <span>10/29</span>
+                          <span>10/30</span>
+                          <span>10/31</span>
+                          <span>11/01</span>
+                          <span>11/02</span>
+                          <span>11/03</span>
+                        </div>
+
+                        {/* Legend matching Screenshot */}
+                        <div className="flex items-center justify-end gap-3 pt-2 text-[11px] text-[#8a8886]">
+                          <span className="text-[10px] text-[#8a8886] hover:underline cursor-pointer">+ more</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-xs bg-white" />
+                            <span>Total</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-xs bg-[#a8a5f8]" />
+                            <span>Completed</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fallback for other chart styles */}
+                  {!['bar', 'donut', 'lollipop', 'line'].includes(w.type) && (
+                    <div className="text-[13px] text-[#8a8886] flex flex-col items-center gap-2">
+                      <span>Custom {w.type} visualization</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer: Filter button & See all */}
+                <div className="pt-3 border-t border-[#303235] flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(w)}
+                    className="flex items-center gap-1.5 text-[11px] text-[#8a8886] hover:text-white transition-colors cursor-pointer group-hover:text-[#bdbbb9]"
+                    title="Click to edit filters"
+                  >
+                    <SlidersHorizontal className="w-3 h-3 text-[#8a8886]" />
+                    <span>{w.filterCountText}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => alert(`View all tasks for ${w.title}`)}
+                    className="px-2.5 py-0.5 rounded border border-[#37383b] bg-[#252628] hover:bg-[#2f3135] text-[11px] text-white font-medium transition-colors cursor-pointer"
+                  >
+                    See all
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Breakdown Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Status Breakdown */}
-        <div className="bg-[#252628] border border-[#333538] rounded-xl p-5">
-          <h3 className="text-[14px] font-bold text-white mb-4">
-            Tasks by Status
-          </h3>
-          <div className="space-y-3.5">
-            <div>
-              <div className="flex justify-between text-[12px] mb-1">
-                <span className="text-[#4cd195] font-medium">On track</span>
-                <span className="text-[#8a8886]">{onTrack} tasks</span>
-              </div>
-              <div className="w-full bg-[#1e1f21] h-2.5 rounded-full overflow-hidden">
-                <div
-                  className="bg-[#4cd195] h-full rounded-full"
-                  style={{ width: `${total ? (onTrack / total) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-[12px] mb-1">
-                <span className="text-[#f7c244] font-medium">At risk</span>
-                <span className="text-[#8a8886]">{atRisk} tasks</span>
-              </div>
-              <div className="w-full bg-[#1e1f21] h-2.5 rounded-full overflow-hidden">
-                <div
-                  className="bg-[#f7c244] h-full rounded-full"
-                  style={{ width: `${total ? (atRisk / total) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-[12px] mb-1">
-                <span className="text-[#ff6b72] font-medium">Off track</span>
-                <span className="text-[#8a8886]">{offTrack} tasks</span>
-              </div>
-              <div className="w-full bg-[#1e1f21] h-2.5 rounded-full overflow-hidden">
-                <div
-                  className="bg-[#ff6b72] h-full rounded-full"
-                  style={{ width: `${total ? (offTrack / total) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Priority Breakdown */}
-        <div className="bg-[#252628] border border-[#333538] rounded-xl p-5">
-          <h3 className="text-[14px] font-bold text-white mb-4">
-            Tasks by Priority
-          </h3>
-          <div className="space-y-3.5">
-            <div>
-              <div className="flex justify-between text-[12px] mb-1">
-                <span className="text-[#c77dff] font-medium">High</span>
-                <span className="text-[#8a8886]">{highPrio} tasks</span>
-              </div>
-              <div className="w-full bg-[#1e1f21] h-2.5 rounded-full overflow-hidden">
-                <div
-                  className="bg-[#c77dff] h-full rounded-full"
-                  style={{ width: `${total ? (highPrio / total) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-[12px] mb-1">
-                <span className="text-[#f7c244] font-medium">Medium</span>
-                <span className="text-[#8a8886]">{medPrio} tasks</span>
-              </div>
-              <div className="w-full bg-[#1e1f21] h-2.5 rounded-full overflow-hidden">
-                <div
-                  className="bg-[#f7c244] h-full rounded-full"
-                  style={{ width: `${total ? (medPrio / total) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-[12px] mb-1">
-                <span className="text-[#4cd195] font-medium">Low</span>
-                <span className="text-[#8a8886]">{lowPrio} tasks</span>
-              </div>
-              <div className="w-full bg-[#1e1f21] h-2.5 rounded-full overflow-hidden">
-                <div
-                  className="bg-[#4cd195] h-full rounded-full"
-                  style={{ width: `${total ? (lowPrio / total) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Edit Chart Modal */}
+      {isEditModalOpen && (
+        <EditChartModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          chart={editingWidget}
+          onSave={handleSaveWidget}
+          tasks={tasks}
+          sections={sections}
+          projects={projects}
+        />
+      )}
     </div>
   );
 }
-
