@@ -14,6 +14,7 @@ import {
   Flag,
   Sparkles,
   Building2,
+  Lock,
   Users,
   Plus,
 } from 'lucide-react';
@@ -92,7 +93,7 @@ export default function TaskRow({
     >
       {/* 1. STICKY LEFT COLUMN: Task Name, Selection Checkbox & Complete Button */}
       <div
-        className={`w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-10 border-r border-[#262729] flex items-center px-3 h-full transition-colors ${
+        className={`w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-10 flex items-center px-3 h-full transition-colors ${
           isSelected
             ? 'bg-[#1b2b48] group-hover:bg-[#203456]'
             : 'bg-[#1e1f21] group-hover:bg-[#232427]'
@@ -191,7 +192,7 @@ export default function TaskRow({
 
       {/* 2. DUE DATE COLUMN (Horizontally Scrollable) */}
       {showDueDateColumn && (
-        <div className="w-[140px] shrink-0 border-r border-[#262729] px-2 flex items-center h-full relative">
+        <div className="w-[140px] shrink-0 px-2 flex items-center h-full relative">
           <button
             type="button"
             onClick={(e) => {
@@ -235,7 +236,7 @@ export default function TaskRow({
 
       {/* 3. COLLABORATORS COLUMN */}
       {showCollaboratorsColumn && (
-        <div className="w-[150px] shrink-0 border-r border-[#262729] px-3 flex items-center h-full">
+        <div className="w-[150px] shrink-0 px-3 flex items-center h-full">
           <div className="flex items-center -space-x-1.5">
             <div
               className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold border border-[#1e1f21]"
@@ -250,7 +251,7 @@ export default function TaskRow({
 
       {/* 4. PROJECTS COLUMN */}
       {showProjectColumn && (
-        <div className="w-[190px] shrink-0 border-r border-[#262729] px-2 flex items-center h-full relative">
+        <div className="w-[190px] shrink-0 px-2 flex items-center h-full relative">
           <button
             type="button"
             onClick={(e) => {
@@ -260,7 +261,7 @@ export default function TaskRow({
             }}
             className="bg-[#2a2b2e] hover:bg-[#343539] text-[#e0dedd] px-2 py-0.5 rounded-md text-[12px] truncate max-w-[180px] flex items-center gap-1.5 transition-colors border border-transparent hover:border-[#424448]"
           >
-            <span className="w-2 h-2 rounded-full bg-[#80eed2] shrink-0" />
+            <span className="w-2.5 h-2 rounded-[2px] bg-white/90 shrink-0" />
             <span className="truncate">{task.projectName || "Kevin's first project"}</span>
           </button>
 
@@ -284,7 +285,7 @@ export default function TaskRow({
                     task.projectId === p.id ? 'text-[#4573d2] font-semibold' : 'text-white'
                   }`}
                 >
-                  <span className="w-2 h-2 rounded-full bg-[#80eed2] shrink-0" />
+                  <span className="w-2.5 h-2 rounded-[2px] bg-white/90 shrink-0" />
                   <span className="truncate">{p.name}</span>
                 </button>
               ))}
@@ -295,9 +296,13 @@ export default function TaskRow({
 
       {/* 5. TASK VISIBILITY COLUMN */}
       {showVisibilityColumn && (
-        <div className="w-[150px] shrink-0 border-r border-[#262729] px-3 flex items-center gap-1.5 text-[#9c9a99] text-[12px] h-full truncate">
-          <Building2 className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
-          <span className="truncate">{task.visibility || 'My workspace'}</span>
+        <div className="w-[150px] shrink-0 px-3 flex items-center gap-1.5 text-[#9c9a99] text-[12px] h-full truncate">
+          {(task.visibility === 'Only me' || task.visibility === 'private' || !task.projectName) ? (
+            <Lock className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
+          ) : (
+            <Building2 className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
+          )}
+          <span className="truncate">{task.visibility || (task.projectName ? 'My workspace' : 'Only me')}</span>
         </div>
       )}
 
@@ -314,7 +319,7 @@ export default function TaskRow({
               setEditingCustomField(col.id);
               setCustomFieldValue(val);
             }}
-            className="w-[150px] shrink-0 border-r border-[#262729] px-3 flex items-center h-full text-[12px] text-[#f5f4f3] truncate hover:bg-[#28292c]/50 transition-colors"
+            className="w-[150px] shrink-0 px-3 flex items-center h-full text-[12px] text-[#f5f4f3] truncate hover:bg-[#28292c]/50 transition-colors"
           >
             {isEditingThis ? (
               <input

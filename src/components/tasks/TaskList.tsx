@@ -119,7 +119,7 @@ export default function TaskList({
   const [filterMode, setFilterMode] = useState<string>('all'); // default to 'all' or 'incomplete'
   const [sortField, setSortField] = useState<string>('none');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [groupField, setGroupField] = useState<string>('section');
+  const [groupField, setGroupField] = useState<string>('none');
   const [groupOrder, setGroupOrder] = useState<string>('Custom order');
 
   // Columns visibility state
@@ -421,7 +421,7 @@ export default function TaskList({
 
   const isFilterActive = filterMode !== 'all';
   const isSortActive = sortField !== 'none';
-  const isGroupActive = groupField !== 'section';
+  const isGroupActive = groupField !== 'none';
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1e1f21] select-none relative overflow-hidden">
@@ -812,7 +812,7 @@ export default function TaskList({
                   </div>
                   <button
                     onClick={() => {
-                      setGroupField('section');
+                      setGroupField('none');
                       setGroupOrder('Custom order');
                     }}
                     className="text-[12px] text-[#8a8886] hover:text-white transition-colors"
@@ -855,6 +855,7 @@ export default function TaskList({
                     {isGroupFieldPickerOpen && (
                       <div className="absolute left-0 top-full mt-1 w-56 bg-[#252628] border border-[#37383b] rounded-xl shadow-2xl py-1 z-50 text-[13px]">
                         {[
+                          { id: 'none', label: 'None', icon: SlidersHorizontal },
                           { id: 'section', label: 'Sections', icon: Layers },
                           { id: 'start_date', label: 'Start date', icon: CalendarIcon },
                           { id: 'due_date', label: 'Due date', icon: CalendarIcon },
@@ -1092,9 +1093,9 @@ export default function TaskList({
       <div className="flex-1 overflow-x-auto overflow-y-auto w-full">
         <div className="min-w-max">
           {/* Table Header */}
-          <div className="flex items-center h-[34px] border-b border-[#2b2c2e] text-[#8a8886] font-semibold text-[11px] select-none bg-[#1e1f21] sticky top-0 z-20">
+          <div className="flex items-center h-[34px] border-b border-[#262729] text-[#8a8886] font-semibold text-[11px] select-none bg-[#1e1f21] sticky top-0 z-30">
             {/* Sticky Name Column Header */}
-            <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-30 bg-[#1e1f21] border-r border-[#262729] px-3 flex items-center h-full">
+            <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-40 bg-[#1e1f21] px-3 flex items-center h-full">
               <div
                 className="w-[24px] flex items-center justify-center shrink-0 cursor-pointer"
                 onClick={handleSelectAllVisible}
@@ -1127,31 +1128,31 @@ export default function TaskList({
                 className="flex items-center gap-1.5 text-white hover:text-white cursor-pointer group"
               >
                 <span className="font-medium text-[12px]">Name</span>
-                <ArrowUpDown className="w-3.5 h-3.5 text-[#6d6c6e] group-hover:text-white transition-colors" />
+                <ArrowUpDown className="w-3.5 h-3.5 text-[#6d6c6e] opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </div>
 
-            {/* Horizontally Scrollable Column Headers */}
+            {/* Horizontally Scrollable Column Headers (No vertical borders) */}
             {columns.dueDate && (
-              <div className="w-[140px] shrink-0 border-r border-[#262729] px-3 flex items-center h-full font-medium text-[12px] text-white">
+              <div className="w-[140px] shrink-0 px-2 flex items-center h-full font-medium text-[12px] text-white">
                 Due date
               </div>
             )}
 
             {columns.collaborators && (
-              <div className="w-[150px] shrink-0 border-r border-[#262729] px-3 flex items-center h-full font-medium text-[12px] text-white">
+              <div className="w-[150px] shrink-0 px-3 flex items-center h-full font-medium text-[12px] text-white">
                 Collaborators
               </div>
             )}
 
             {columns.project && (
-              <div className="w-[190px] shrink-0 border-r border-[#262729] px-3 flex items-center h-full font-medium text-[12px] text-white">
+              <div className="w-[190px] shrink-0 px-2 flex items-center h-full font-medium text-[12px] text-white">
                 Projects
               </div>
             )}
 
             {columns.visibility && (
-              <div className="w-[150px] shrink-0 border-r border-[#262729] px-3 flex items-center h-full font-medium text-[12px] text-white">
+              <div className="w-[150px] shrink-0 px-3 flex items-center h-full font-medium text-[12px] text-white">
                 Task visibility
               </div>
             )}
@@ -1160,7 +1161,7 @@ export default function TaskList({
             {customColumns.map((col) => (
               <div
                 key={col.id}
-                className="w-[150px] shrink-0 border-r border-[#262729] px-3 flex items-center justify-between h-full font-medium text-[12px] text-white group/col"
+                className="w-[150px] shrink-0 px-3 flex items-center justify-between h-full font-medium text-[12px] text-white group/col"
               >
                 <span className="truncate">{col.name}</span>
                 <button
@@ -1255,109 +1256,112 @@ export default function TaskList({
           <div className="pb-24">
             {groupedData.map((group) => {
               const isCollapsed = collapsedSections[group.id];
+              const isUngrouped = groupField === 'none' || group.id === 'all';
 
               return (
-                <div key={group.id} className="border-b border-[#252628]">
-                  {/* Section Header Row */}
-                  <div className="flex items-center h-[38px] border-b border-[#252628] bg-[#1e1f21] group/sec">
-                    {/* Sticky Left Section Header */}
-                    <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-20 bg-[#1e1f21] group-hover/sec:bg-[#252628] border-r border-[#262729] px-3 h-full flex items-center justify-between transition-colors">
-                      <div
-                        onClick={() => toggleSection(group.id)}
-                        className="flex items-center gap-2 flex-1 cursor-pointer select-none"
-                      >
-                        {isCollapsed ? (
-                          <ChevronRight className="w-4 h-4 text-[#8a8886] group-hover/sec:text-white" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-[#8a8886] group-hover/sec:text-white" />
-                        )}
-
-                        {editingSectionName === group.id ? (
-                          <input
-                            type="text"
-                            autoFocus
-                            value={editSectionValue}
-                            onChange={(e) => setEditSectionValue(e.target.value)}
-                            onBlur={() => handleSaveRenameSection(group.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveRenameSection(group.id);
-                              if (e.key === 'Escape') setEditingSectionName(null);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-[#1e1f21] border border-[#4573d2] rounded px-1.5 py-0.5 text-white text-[13px] outline-none"
-                          />
-                        ) : (
-                          <div className="flex items-center gap-2 text-[13px] font-bold text-white">
-                            <span>{group.groupName}</span>
-                            <span className="text-[11px] font-normal text-[#8a8886] bg-[#2a2b2d] px-1.5 py-0.2 rounded-full">
-                              {group.tasks.length}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="relative flex items-center opacity-0 group-hover/sec:opacity-100 transition-opacity" data-popover>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setInlineNewTaskSection(group.id);
-                          }}
-                          className="p-1 hover:bg-[#323336] rounded text-[#8a8886] hover:text-white mr-1"
-                          title="Add task to section"
+                <div key={group.id} className={isUngrouped ? '' : 'border-b border-[#252628]'}>
+                  {/* Section Header Row (Only shown when grouped) */}
+                  {!isUngrouped && (
+                    <div className="flex items-center h-[38px] border-b border-[#252628] bg-[#1e1f21] group/sec">
+                      {/* Sticky Left Section Header */}
+                      <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-10 bg-[#1e1f21] group-hover/sec:bg-[#252628] px-3 h-full flex items-center justify-between transition-colors">
+                        <div
+                          onClick={() => toggleSection(group.id)}
+                          className="flex items-center gap-2 flex-1 cursor-pointer select-none"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
+                          {isCollapsed ? (
+                            <ChevronRight className="w-4 h-4 text-[#8a8886] group-hover/sec:text-white" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-[#8a8886] group-hover/sec:text-white" />
+                          )}
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenSectionMenu((prev) => (prev === group.id ? null : group.id));
-                          }}
-                          className="p-1 hover:bg-[#323336] rounded text-[#8a8886] hover:text-white"
-                          title="Section actions"
-                        >
-                          <MoreHorizontal className="w-3.5 h-3.5" />
-                        </button>
-
-                        {openSectionMenu === group.id && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute right-0 top-7 w-44 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-30 text-[13px]"
-                          >
-                            <button
-                              onClick={() => {
-                                setInlineNewTaskSection(group.id);
-                                setOpenSectionMenu(null);
+                          {editingSectionName === group.id ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editSectionValue}
+                              onChange={(e) => setEditSectionValue(e.target.value)}
+                              onBlur={() => handleSaveRenameSection(group.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveRenameSection(group.id);
+                                if (e.key === 'Escape') setEditingSectionName(null);
                               }}
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
-                            >
-                              <Plus className="w-3.5 h-3.5 text-[#8a8886]" />
-                              <span>Add task</span>
-                            </button>
-                            <button
-                              onClick={() => handleStartRenameSection(group.id)}
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
-                            >
-                              <Edit2 className="w-3.5 h-3.5 text-[#8a8886]" />
-                              <span>Rename section</span>
-                            </button>
-                            {sections.length > 1 && (
-                              <button
-                                onClick={() => handleDeleteSection(group.id)}
-                                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#ff6b72] hover:bg-[#2f3135] transition-colors border-t border-[#37383b] mt-1 pt-1.5"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-[#ff6b72]" />
-                                <span>Delete section</span>
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                              onClick={(e) => e.stopPropagation()}
+                              className="bg-[#1e1f21] border border-[#4573d2] rounded px-1.5 py-0.5 text-white text-[13px] outline-none"
+                            />
+                          ) : (
+                            <div className="flex items-center gap-2 text-[13px] font-bold text-white">
+                              <span>{group.groupName}</span>
+                              <span className="text-[11px] font-normal text-[#8a8886] bg-[#2a2b2d] px-1.5 py-0.2 rounded-full">
+                                {group.tasks.length}
+                              </span>
+                            </div>
+                          )}
+                        </div>
 
-                    {/* Rest of Section row background spanning into columns */}
-                    <div className="flex-1 h-full bg-[#1e1f21] group-hover/sec:bg-[#252628] transition-colors" />
-                  </div>
+                        <div className="relative flex items-center opacity-0 group-hover/sec:opacity-100 transition-opacity" data-popover>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInlineNewTaskSection(group.id);
+                            }}
+                            className="p-1 hover:bg-[#323336] rounded text-[#8a8886] hover:text-white mr-1"
+                            title="Add task to section"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenSectionMenu((prev) => (prev === group.id ? null : group.id));
+                            }}
+                            className="p-1 hover:bg-[#323336] rounded text-[#8a8886] hover:text-white"
+                            title="Section actions"
+                          >
+                            <MoreHorizontal className="w-3.5 h-3.5" />
+                          </button>
+
+                          {openSectionMenu === group.id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 top-7 w-44 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-30 text-[13px]"
+                            >
+                              <button
+                                onClick={() => {
+                                  setInlineNewTaskSection(group.id);
+                                  setOpenSectionMenu(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
+                              >
+                                <Plus className="w-3.5 h-3.5 text-[#8a8886]" />
+                                <span>Add task</span>
+                              </button>
+                              <button
+                                onClick={() => handleStartRenameSection(group.id)}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
+                              >
+                                <Edit2 className="w-3.5 h-3.5 text-[#8a8886]" />
+                                <span>Rename section</span>
+                              </button>
+                              {sections.length > 1 && (
+                                <button
+                                  onClick={() => handleDeleteSection(group.id)}
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#ff6b72] hover:bg-[#2f3135] transition-colors border-t border-[#37383b] mt-1 pt-1.5"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-[#ff6b72]" />
+                                  <span>Delete section</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Rest of Section row background spanning into columns */}
+                      <div className="flex-1 h-full bg-[#1e1f21] group-hover/sec:bg-[#252628] transition-colors" />
+                    </div>
+                  )}
 
                   {/* Section Tasks Table Rows */}
                   {!isCollapsed && (
@@ -1381,10 +1385,24 @@ export default function TaskList({
                         />
                       ))}
 
-                      {/* Inline Task Creation Row */}
-                      {inlineNewTaskSection === group.id ? (
+                      {/* Ungrouped Add Task row */}
+                      {isUngrouped && (
+                        <div className="flex items-center h-[36px] border-b border-transparent hover:bg-[#232427]/40 transition-colors group/add">
+                          <div
+                            onClick={() => handleQuickAdd('task')}
+                            className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-10 bg-[#1e1f21] group-hover/add:bg-[#232427] px-9 h-full flex items-center gap-2 text-[13px] text-[#8a8886] group-hover/add:text-white cursor-pointer transition-colors"
+                          >
+                            <Plus className="w-3.5 h-3.5 text-[#6d6c6e] group-hover/add:text-white transition-colors" />
+                            <span>Add task</span>
+                          </div>
+                          <div className="flex-1 h-full" />
+                        </div>
+                      )}
+
+                      {/* Grouped Inline Task Creation Row */}
+                      {!isUngrouped && inlineNewTaskSection === group.id ? (
                         <div className="flex items-center h-[38px] border-b border-[#262729] bg-[#1e1f21]">
-                          <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-10 bg-[#1e1f21] border-r border-[#262729] px-3 h-full flex items-center gap-2">
+                          <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-10 bg-[#1e1f21] px-3 h-full flex items-center gap-2">
                             <input
                               type="text"
                               autoFocus
@@ -1412,28 +1430,28 @@ export default function TaskList({
                           </div>
                           <div className="flex-1 h-full bg-[#1e1f21]" />
                         </div>
-                      ) : (
+                      ) : !isUngrouped ? (
                         <div className="flex items-center h-[34px] border-b border-transparent hover:bg-[#232427]/40 transition-colors group/add">
                           <div
                             onClick={() => setInlineNewTaskSection(group.id)}
-                            className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-10 bg-[#1e1f21] group-hover/add:bg-[#232427] border-r border-[#262729] px-9 h-full flex items-center gap-2 text-[12.5px] text-[#8a8886] group-hover/add:text-white cursor-pointer transition-colors"
+                            className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-10 bg-[#1e1f21] group-hover/add:bg-[#232427] px-9 h-full flex items-center gap-2 text-[12.5px] text-[#8a8886] group-hover/add:text-white cursor-pointer transition-colors"
                           >
                             <Plus className="w-3.5 h-3.5 text-[#6d6c6e] group-hover/add:text-white transition-colors" />
                             <span>Add task</span>
                           </div>
                           <div className="flex-1 h-full" />
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   )}
                 </div>
               );
             })}
 
-            {/* Add Section Button / Input */}
+            {/* Add Section Button / Input (Only when Group by Section is active) */}
             {groupField === 'section' && (
               <div className="flex items-center h-[42px] border-b border-transparent mt-1">
-                <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-10 bg-[#1e1f21] border-r border-[#262729] px-3 h-full flex items-center">
+                <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-10 bg-[#1e1f21] px-3 h-full flex items-center">
                   {isAddingSection ? (
                     <div className="flex items-center gap-2 w-full">
                       <input
