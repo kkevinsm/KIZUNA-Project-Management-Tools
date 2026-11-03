@@ -24,6 +24,12 @@ import {
   Clock,
   Sparkles,
   Edit2,
+  User,
+  Type,
+  GripVertical,
+  ClipboardList,
+  Eye,
+  Tag,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import TaskRow from '@/components/tasks/TaskRow';
@@ -31,6 +37,7 @@ import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskCalendar from '@/components/tasks/TaskCalendar';
 import TaskDashboard from '@/components/tasks/TaskDashboard';
 import FileManager from '@/components/files/FileManager';
+import ListOptionsDrawer from '@/components/tasks/ListOptionsDrawer';
 import { Task, PriorityLevel } from '@/lib/types';
 
 export default function MyTasksPage() {
@@ -68,23 +75,43 @@ export default function MyTasksPage() {
   const [isAddingSection, setIsAddingSection] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState('');
 
-  // Toolbar menus
+  // Toolbar popovers
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
-  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
-  const [isGroupMenuOpen, setIsGroupMenuOpen] = useState(false);
-  const [isOptionsMenuOpen, setIsOptionsMenuOpen] = useState(false);
+  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+  const [isSortPopoverOpen, setIsSortPopoverOpen] = useState(false);
+  const [isGroupPopoverOpen, setIsGroupPopoverOpen] = useState(false);
+  const [isGroupFieldPickerOpen, setIsGroupFieldPickerOpen] = useState(false);
+  const [isGroupOrderPickerOpen, setIsGroupOrderPickerOpen] = useState(false);
+  const [isAddFilterMenuOpen, setIsAddFilterMenuOpen] = useState(false);
+  const [isCompletedTasksSubmenuOpen, setIsCompletedTasksSubmenuOpen] = useState(false);
 
-  // Filter, Sort, Group & Column visibility
-  const [filterMode, setFilterMode] = useState<'incomplete' | 'completed' | 'all' | 'due_today' | 'due_this_week'>('incomplete');
-  const [sortMode, setSortMode] = useState<'none' | 'due_date' | 'priority' | 'alphabetical'>('none');
-  const [groupMode, setGroupMode] = useState<'section' | 'priority' | 'due_date' | 'project' | 'none'>('section');
-  const [columnVisibility, setColumnVisibility] = useState({
+  // Right-side Options Drawer
+  const [isListOptionsDrawerOpen, setIsListOptionsDrawerOpen] = useState(false);
+
+  // Filter, Sort, Group State
+  const [filterMode, setFilterMode] = useState<string>('incomplete'); // 'incomplete' | 'completed' | 'all' | 'due_this_week' | 'due_next_week'
+  const [sortField, setSortField] = useState<string>('none'); // 'none' | 'start_date' | 'due_date' | 'created_by' | 'created_on' | 'last_modified' | 'completed_on' | 'likes' | 'alphabetical' | 'project'
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [groupField, setGroupField] = useState<string>('section'); // 'section' | 'start_date' | 'due_date' | 'created_by' | 'created_on' | 'last_modified' | 'completed_on' | 'project' | 'none'
+  const [groupOrder, setGroupOrder] = useState<string>('Custom order'); // 'Custom order' | 'Ascending' | 'Descending'
+
+  // Columns visibility state
+  const [columns, setColumns] = useState<Record<string, boolean>>({
     project: true,
     dueDate: true,
     priority: true,
     visibility: false,
+    assignee: false,
+    createdBy: false,
+    createdOn: false,
+    completedOn: false,
+    likes: false,
+    tags: false,
   });
+
+  const handleToggleColumn = (colKey: string) => {
+    setColumns((prev) => ({ ...prev, [colKey]: !prev[colKey] }));
+  };
 
   // Search
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -93,16 +120,19 @@ export default function MyTasksPage() {
   // Multi-selection
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
 
-  // Close menus when clicking outside
+  // Close popovers when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('[data-dropdown]')) {
+      if (!target.closest('[data-popover]')) {
         setIsAddMenuOpen(false);
-        setIsFilterMenuOpen(false);
-        setIsSortMenuOpen(false);
-        setIsGroupMenuOpen(false);
-        setIsOptionsMenuOpen(false);
+        setIsFilterPopoverOpen(false);
+        setIsSortPopoverOpen(false);
+        setIsGroupPopoverOpen(false);
+        setIsGroupFieldPickerOpen(false);
+        setIsGroupOrderPickerOpen(false);
+        setIsAddFilterMenuOpen(false);
+        setIsCompletedTasksSubmenuOpen(false);
         setOpenSectionMenu(null);
       }
     };
@@ -126,7 +156,6 @@ export default function MyTasksPage() {
     const trimmed = editSectionValue.trim();
     if (trimmed && trimmed !== oldName) {
       setSections((prev) => prev.map((s) => (s === oldName ? trimmed : s)));
-      // Also update tasks assigned to oldName
       tasks.forEach((t) => {
         const currentSec = t.myTasksSection || t.section;
         if (currentSec === oldName) {
@@ -140,7 +169,6 @@ export default function MyTasksPage() {
   // Section delete
   const handleDeleteSection = (sectionToDelete: string) => {
     setSections((prev) => prev.filter((s) => s !== sectionToDelete));
-    // Move any tasks in this section back to Recently assigned
     tasks.forEach((t) => {
       const currentSec = t.myTasksSection || t.section;
       if (currentSec === sectionToDelete) {
@@ -178,7 +206,6 @@ export default function MyTasksPage() {
     });
 
     setInlineTaskName('');
-    // Keep inline creator open for quick consecutive task additions
   };
 
   // Split button quick add
@@ -188,19 +215,19 @@ export default function MyTasksPage() {
     setIsAddMenuOpen(false);
   };
 
-  // Filter logic
+  // Filter tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
-      // 1. Completion / Status filter
+      // 1. Completion / status filter
       if (filterMode === 'incomplete' && t.completed) return false;
       if (filterMode === 'completed' && !t.completed) return false;
-      if (filterMode === 'due_today') {
-        const due = (t.dueDate || '').toLowerCase();
-        if (!due.includes('today') && !due.includes('nov 3')) return false;
-      }
       if (filterMode === 'due_this_week') {
         const due = (t.dueDate || '').toLowerCase();
         if (!due || due.includes('later')) return false;
+      }
+      if (filterMode === 'due_next_week') {
+        const due = (t.dueDate || '').toLowerCase();
+        if (!due.includes('nov 10') && !due.includes('next week')) return false;
       }
 
       // 2. Search keyword filter
@@ -215,43 +242,37 @@ export default function MyTasksPage() {
     });
   }, [tasks, filterMode, searchKeyword]);
 
-  // Sort logic
+  // Sort tasks
   const sortedTasks = useMemo(() => {
     const list = [...filteredTasks];
-    if (sortMode === 'due_date') {
-      return list.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
-    }
-    if (sortMode === 'priority') {
-      const rank: Record<string, number> = { High: 3, Medium: 2, Low: 1 };
-      return list.sort((a, b) => (rank[b.priority || ''] || 0) - (rank[a.priority || ''] || 0));
-    }
-    if (sortMode === 'alphabetical') {
-      return list.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    return list;
-  }, [filteredTasks, sortMode]);
+    if (sortField === 'none') return list;
 
-  // Group logic
+    list.sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'due_date' || sortField === 'start_date') {
+        comparison = (a.dueDate || '').localeCompare(b.dueDate || '');
+      } else if (sortField === 'alphabetical') {
+        comparison = a.name.localeCompare(b.name);
+      } else if (sortField === 'project') {
+        comparison = (a.projectName || '').localeCompare(b.projectName || '');
+      } else if (sortField === 'created_by') {
+        comparison = (a.assignee?.name || '').localeCompare(b.assignee?.name || '');
+      } else if (sortField === 'created_on') {
+        comparison = (a.createdAt || '').localeCompare(b.createdAt || '');
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return list;
+  }, [filteredTasks, sortField, sortDirection]);
+
+  // Group tasks
   const groupedData = useMemo(() => {
-    if (groupMode === 'none') {
+    if (groupField === 'none') {
       return [{ groupName: 'All tasks', tasks: sortedTasks, id: 'all' }];
     }
 
-    if (groupMode === 'priority') {
-      const priorities: PriorityLevel[] = ['High', 'Medium', 'Low'];
-      const groups: { groupName: string; id: string; tasks: Task[] }[] = priorities.map((p) => ({
-        groupName: `${p} Priority`,
-        id: p,
-        tasks: sortedTasks.filter((t) => t.priority === p),
-      }));
-      const noneTasks = sortedTasks.filter((t) => !t.priority);
-      if (noneTasks.length > 0) {
-        groups.push({ groupName: 'No Priority', id: 'none', tasks: noneTasks });
-      }
-      return groups;
-    }
-
-    if (groupMode === 'project') {
+    if (groupField === 'project') {
       const projectMap = new Map<string, Task[]>();
       sortedTasks.forEach((t) => {
         const pName = t.projectName || 'No project';
@@ -263,6 +284,15 @@ export default function MyTasksPage() {
         id: pName,
         tasks: pTasks,
       }));
+    }
+
+    if (groupField === 'due_date') {
+      const groups = [
+        { groupName: 'Today', id: 'today', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('today')) },
+        { groupName: 'Upcoming', id: 'upcoming', tasks: sortedTasks.filter((t) => !(t.dueDate || '').toLowerCase().includes('today') && t.dueDate) },
+        { groupName: 'No Due Date', id: 'no_due', tasks: sortedTasks.filter((t) => !t.dueDate) },
+      ];
+      return groups.filter((g) => g.tasks.length > 0);
     }
 
     // Default: Group by Section
@@ -277,7 +307,7 @@ export default function MyTasksPage() {
         tasks: secTasks,
       };
     });
-  }, [sortedTasks, groupMode, sections]);
+  }, [sortedTasks, groupField, sections]);
 
   // Multi-select handlers
   const handleToggleSelectTask = (taskId: string) => {
@@ -302,41 +332,35 @@ export default function MyTasksPage() {
 
   // Mass actions
   const handleMassComplete = () => {
-    selectedTaskIds.forEach((id) => {
-      updateTask(id, { completed: true });
-    });
+    selectedTaskIds.forEach((id) => updateTask(id, { completed: true }));
     setSelectedTaskIds(new Set());
   };
 
   const handleMassIncomplete = () => {
-    selectedTaskIds.forEach((id) => {
-      updateTask(id, { completed: false });
-    });
+    selectedTaskIds.forEach((id) => updateTask(id, { completed: false }));
     setSelectedTaskIds(new Set());
   };
 
   const handleMassDelete = () => {
     if (confirm(`Delete ${selectedTaskIds.size} selected tasks?`)) {
-      selectedTaskIds.forEach((id) => {
-        deleteTask(id);
-      });
+      selectedTaskIds.forEach((id) => deleteTask(id));
       setSelectedTaskIds(new Set());
     }
   };
 
   const handleMassMoveSection = (targetSection: string) => {
-    selectedTaskIds.forEach((id) => {
-      updateTask(id, { myTasksSection: targetSection });
-    });
+    selectedTaskIds.forEach((id) => updateTask(id, { myTasksSection: targetSection }));
     setSelectedTaskIds(new Set());
   };
 
   const handleMassSetDueDate = (datePreset: string) => {
-    selectedTaskIds.forEach((id) => {
-      updateTask(id, { dueDate: datePreset });
-    });
+    selectedTaskIds.forEach((id) => updateTask(id, { dueDate: datePreset }));
     setSelectedTaskIds(new Set());
   };
+
+  const isFilterActive = filterMode !== 'all';
+  const isSortActive = sortField !== 'none';
+  const isGroupActive = groupField !== 'section' || groupOrder !== 'Custom order';
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1e1f21] select-none relative overflow-hidden">
@@ -367,7 +391,7 @@ export default function MyTasksPage() {
               <span>Share</span>
             </button>
             <button
-              onClick={() => alert('Customize My Tasks')}
+              onClick={() => setIsListOptionsDrawerOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252628] hover:bg-[#2f3135] text-[#f5f4f3] border border-[#37383b] text-[12px] font-medium transition-colors"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -405,8 +429,8 @@ export default function MyTasksPage() {
       {/* Action Toolbar for List View */}
       {activeTab === 'List' && (
         <div className="h-[44px] min-h-[44px] px-6 border-b border-[#2b2c2e] flex items-center justify-between text-[13px] relative z-20">
-          {/* Add task split button with dropdown */}
-          <div className="relative inline-flex items-stretch h-7 rounded-lg overflow-hidden shadow-xs bg-[#4573d2]" data-dropdown>
+          {/* Add task split button */}
+          <div className="relative inline-flex items-stretch h-7 rounded-lg overflow-hidden shadow-xs bg-[#4573d2]" data-popover>
             <button
               type="button"
               onClick={() => handleQuickAdd('task')}
@@ -455,211 +479,437 @@ export default function MyTasksPage() {
 
           {/* Right action controls */}
           <div className="flex items-center gap-2 text-[#bdbbb9] text-[12px]">
-            {/* Filter Dropdown */}
-            <div className="relative" data-dropdown>
+            {/* 1. FILTER BUTTON & ASANA FILTER POPOVER (Image 1) */}
+            <div className="relative" data-popover>
               <button
-                onClick={() => setIsFilterMenuOpen((prev) => !prev)}
+                onClick={() => {
+                  setIsFilterPopoverOpen((prev) => !prev);
+                  setIsSortPopoverOpen(false);
+                  setIsGroupPopoverOpen(false);
+                }}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors ${
-                  filterMode !== 'all'
-                    ? 'bg-[#1b2b48] text-[#4573d2] border border-[#2d4370]'
+                  isFilterActive || isFilterPopoverOpen
+                    ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
                     : 'hover:text-white hover:bg-[#28292c]'
                 }`}
               >
                 <Filter className="w-3.5 h-3.5" />
-                <span>
-                  {filterMode === 'incomplete' && 'Incomplete tasks'}
-                  {filterMode === 'completed' && 'Completed tasks'}
-                  {filterMode === 'due_today' && 'Due today'}
-                  {filterMode === 'due_this_week' && 'Due this week'}
-                  {filterMode === 'all' && 'Filter'}
-                </span>
-                <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
+                <span>Filter</span>
               </button>
 
-              {isFilterMenuOpen && (
-                <div className="absolute right-0 top-8 w-48 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-30 text-[13px]">
-                  <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider">
-                    Task filter
-                  </div>
-                  {[
-                    { id: 'incomplete', label: 'Incomplete tasks' },
-                    { id: 'completed', label: 'Completed tasks' },
-                    { id: 'all', label: 'All tasks' },
-                    { id: 'due_today', label: 'Due today' },
-                    { id: 'due_this_week', label: 'Due this week' },
-                  ].map((opt) => (
+              {/* Exact Asana Filter Popover */}
+              {isFilterPopoverOpen && (
+                <div className="absolute right-0 top-8 w-[420px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl p-4 z-40 text-[13px] animate-in fade-in duration-150">
+                  {/* Popover Header */}
+                  <div className="flex items-center justify-between pb-3">
+                    <span className="font-bold text-white text-[14px]">Filters</span>
                     <button
-                      key={opt.id}
-                      onClick={() => {
-                        setFilterMode(opt.id as any);
-                        setIsFilterMenuOpen(false);
-                      }}
-                      className="w-full flex items-center justify-between px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
+                      onClick={() => setFilterMode('all')}
+                      className="text-[12px] text-[#8a8886] hover:text-white transition-colors"
                     >
-                      <span>{opt.label}</span>
-                      {filterMode === opt.id && <Check className="w-3.5 h-3.5 text-[#4573d2]" />}
+                      Clear
                     </button>
-                  ))}
+                  </div>
+
+                  {/* Quick Filters */}
+                  <div className="space-y-2">
+                    <span className="text-[11.5px] font-medium text-[#8a8886] block">
+                      Quick filters
+                    </span>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Incomplete tasks pill */}
+                      <button
+                        onClick={() => setFilterMode(filterMode === 'incomplete' ? 'all' : 'incomplete')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors ${
+                          filterMode === 'incomplete'
+                            ? 'bg-[#252628] border-[#3b3d42] text-white'
+                            : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
+                        }`}
+                      >
+                        <Check className="w-3 h-3 text-[#4573d2]" />
+                        <span>Incomplete tasks</span>
+                      </button>
+
+                      {/* Completed tasks pill with dropdown */}
+                      <div className="relative">
+                        <button
+                          onClick={() => {
+                            setFilterMode('completed');
+                            setIsCompletedTasksSubmenuOpen((prev) => !prev);
+                          }}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors ${
+                            filterMode === 'completed'
+                              ? 'bg-[#252628] border-[#3b3d42] text-white'
+                              : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
+                          }`}
+                        >
+                          <Check className="w-3 h-3 text-[#4573d2]" />
+                          <span>Completed tasks</span>
+                          <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
+                        </button>
+
+                        {isCompletedTasksSubmenuOpen && (
+                          <div className="absolute left-0 top-full mt-1 w-44 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-50 text-[12px]">
+                            {['All completed', 'Completed today', 'Completed this week'].map((item) => (
+                              <button
+                                key={item}
+                                onClick={() => {
+                                  setFilterMode('completed');
+                                  setIsCompletedTasksSubmenuOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-1.5 hover:bg-[#2f3135] text-white"
+                              >
+                                {item}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Due this week pill */}
+                      <button
+                        onClick={() => setFilterMode(filterMode === 'due_this_week' ? 'all' : 'due_this_week')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors ${
+                          filterMode === 'due_this_week'
+                            ? 'bg-[#252628] border-[#3b3d42] text-white'
+                            : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
+                        }`}
+                      >
+                        <CalendarIcon className="w-3.5 h-3.5" />
+                        <span>Due this week</span>
+                      </button>
+
+                      {/* Due next week pill */}
+                      <button
+                        onClick={() => setFilterMode(filterMode === 'due_next_week' ? 'all' : 'due_next_week')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors ${
+                          filterMode === 'due_next_week'
+                            ? 'bg-[#252628] border-[#3b3d42] text-white'
+                            : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
+                        }`}
+                      >
+                        <CalendarIcon className="w-3.5 h-3.5" />
+                        <span>Due next week</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Add Filter Row */}
+                  <div className="mt-4 pt-3 border-t border-[#2b2c2e] relative">
+                    <button
+                      onClick={() => setIsAddFilterMenuOpen((prev) => !prev)}
+                      className="flex items-center gap-1.5 text-[12.5px] text-[#8a8886] hover:text-white transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add filter</span>
+                      <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
+                    </button>
+
+                    {isAddFilterMenuOpen && (
+                      <div className="absolute left-0 top-full mt-1 w-48 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-50 text-[12.5px]">
+                        {[
+                          { id: 'completion', label: 'Completion status' },
+                          { id: 'created_by', label: 'Created by' },
+                          { id: 'created_on', label: 'Created on' },
+                          { id: 'last_modified', label: 'Last modified on' },
+                          { id: 'completed_on', label: 'Completed on' },
+                          { id: 'task_type', label: 'Task type' },
+                        ].map((f) => (
+                          <button
+                            key={f.id}
+                            onClick={() => {
+                              setIsAddFilterMenuOpen(false);
+                              setIsListOptionsDrawerOpen(true);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Sort Dropdown */}
-            <div className="relative" data-dropdown>
+            {/* 2. SORT BUTTON & ASANA SORT POPOVER (Image 2) */}
+            <div className="relative" data-popover>
               <button
-                onClick={() => setIsSortMenuOpen((prev) => !prev)}
+                onClick={() => {
+                  setIsSortPopoverOpen((prev) => !prev);
+                  setIsFilterPopoverOpen(false);
+                  setIsGroupPopoverOpen(false);
+                }}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors ${
-                  sortMode !== 'none'
-                    ? 'bg-[#1b2b48] text-[#4573d2] border border-[#2d4370]'
+                  isSortActive || isSortPopoverOpen
+                    ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
                     : 'hover:text-white hover:bg-[#28292c]'
                 }`}
               >
                 <ArrowUpDown className="w-3.5 h-3.5" />
-                <span>
-                  {sortMode === 'none' && 'Sort'}
-                  {sortMode === 'due_date' && 'Sort: Due date'}
-                  {sortMode === 'priority' && 'Sort: Priority'}
-                  {sortMode === 'alphabetical' && 'Sort: Alphabetical'}
-                </span>
-                <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
+                <span>Sort</span>
               </button>
 
-              {isSortMenuOpen && (
-                <div className="absolute right-0 top-8 w-44 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-30 text-[13px]">
-                  <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider">
-                    Sort by
-                  </div>
+              {/* Exact Asana Sort Popover */}
+              {isSortPopoverOpen && (
+                <div className="absolute right-0 top-8 w-56 bg-[#252628] border border-[#37383b] rounded-xl shadow-2xl py-1.5 z-40 text-[13px] animate-in fade-in duration-150">
                   {[
-                    { id: 'none', label: 'None' },
-                    { id: 'due_date', label: 'Due date' },
-                    { id: 'priority', label: 'Priority' },
-                    { id: 'alphabetical', label: 'Alphabetical' },
-                  ].map((opt) => (
-                    <button
-                      key={opt.id}
-                      onClick={() => {
-                        setSortMode(opt.id as any);
-                        setIsSortMenuOpen(false);
-                      }}
-                      className="w-full flex items-center justify-between px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
-                    >
-                      <span>{opt.label}</span>
-                      {sortMode === opt.id && <Check className="w-3.5 h-3.5 text-[#4573d2]" />}
-                    </button>
-                  ))}
+                    { id: 'start_date', label: 'Start date', icon: CalendarIcon },
+                    { id: 'due_date', label: 'Due date', icon: CalendarIcon },
+                    { id: 'created_by', label: 'Created by', icon: User },
+                    { id: 'created_on', label: 'Created on', icon: Clock },
+                    { id: 'last_modified', label: 'Last modified on', icon: Clock },
+                    { id: 'completed_on', label: 'Completed on', icon: Clock },
+                    { id: 'likes', label: 'Likes', icon: ThumbsUp },
+                    { id: 'alphabetical', label: 'Alphabetical', icon: Type },
+                    { id: 'project', label: 'Project', icon: ClipboardList },
+                  ].map((item) => {
+                    const IconComp = item.icon;
+                    const isSelected = sortField === item.id;
+
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                          } else {
+                            setSortField(item.id);
+                            setSortDirection('asc');
+                          }
+                          setIsSortPopoverOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between px-3.5 py-2 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <IconComp className="w-4 h-4 text-[#8a8886]" />
+                          <span>{item.label}</span>
+                        </div>
+                        {isSelected && (
+                          <span className="text-[11px] text-[#4573d2] font-semibold">
+                            {sortDirection === 'asc' ? '↑ Asc' : '↓ Desc'}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+
+                  {/* Clear sort option */}
+                  {sortField !== 'none' && (
+                    <div className="pt-1 mt-1 border-t border-[#37383b]">
+                      <button
+                        onClick={() => {
+                          setSortField('none');
+                          setIsSortPopoverOpen(false);
+                        }}
+                        className="w-full px-3.5 py-1.5 text-left text-[12px] text-[#ff6b72] hover:bg-[#2f3135] transition-colors"
+                      >
+                        Clear sort
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Group Dropdown */}
-            <div className="relative" data-dropdown>
+            {/* 3. GROUP BUTTON & ASANA GROUPS POPOVER (Image 3 & 4) */}
+            <div className="relative" data-popover>
               <button
-                onClick={() => setIsGroupMenuOpen((prev) => !prev)}
+                onClick={() => {
+                  setIsGroupPopoverOpen((prev) => !prev);
+                  setIsFilterPopoverOpen(false);
+                  setIsSortPopoverOpen(false);
+                }}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors ${
-                  groupMode !== 'section'
-                    ? 'bg-[#1b2b48] text-[#4573d2] border border-[#2d4370]'
+                  isGroupActive || isGroupPopoverOpen
+                    ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
                     : 'hover:text-white hover:bg-[#28292c]'
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>
-                  {groupMode === 'section' && 'Group: Section'}
-                  {groupMode === 'priority' && 'Group: Priority'}
-                  {groupMode === 'project' && 'Group: Project'}
-                  {groupMode === 'none' && 'Group: None'}
-                </span>
-                <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
+                <span>Group</span>
               </button>
 
-              {isGroupMenuOpen && (
-                <div className="absolute right-0 top-8 w-44 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-30 text-[13px]">
-                  <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider">
-                    Group by
-                  </div>
-                  {[
-                    { id: 'section', label: 'Section' },
-                    { id: 'priority', label: 'Priority' },
-                    { id: 'project', label: 'Project' },
-                    { id: 'none', label: 'None' },
-                  ].map((opt) => (
+              {/* Exact Asana Groups Popover */}
+              {isGroupPopoverOpen && (
+                <div className="absolute right-0 top-8 w-[420px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl p-4 z-40 text-[13px] animate-in fade-in duration-150">
+                  {/* Header: Groups, Send feedback, Clear */}
+                  <div className="flex items-center justify-between pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white text-[14px]">Groups</span>
+                      <button
+                        onClick={() => alert('Feedback submitted! Thank you.')}
+                        className="text-[12px] text-[#8b5cf6] hover:underline"
+                      >
+                        Send feedback
+                      </button>
+                    </div>
                     <button
-                      key={opt.id}
                       onClick={() => {
-                        setGroupMode(opt.id as any);
-                        setIsGroupMenuOpen(false);
+                        setGroupField('none');
+                        setGroupOrder('Custom order');
                       }}
-                      className="w-full flex items-center justify-between px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
+                      className="text-[12px] text-[#8a8886] hover:text-white transition-colors"
                     >
-                      <span>{opt.label}</span>
-                      {groupMode === opt.id && <Check className="w-3.5 h-3.5 text-[#4573d2]" />}
+                      Clear
                     </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Options Dropdown (Column Toggles) */}
-            <div className="relative" data-dropdown>
-              <button
-                onClick={() => setIsOptionsMenuOpen((prev) => !prev)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:text-white hover:bg-[#28292c] transition-colors"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>Options</span>
-              </button>
-
-              {isOptionsMenuOpen && (
-                <div className="absolute right-0 top-8 w-48 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1.5 z-30 text-[13px]">
-                  <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider">
-                    Visible fields
                   </div>
-                  <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] cursor-pointer text-[#f5f4f3]">
-                    <input
-                      type="checkbox"
-                      checked={columnVisibility.project}
-                      onChange={(e) =>
-                        setColumnVisibility((prev) => ({ ...prev, project: e.target.checked }))
-                      }
-                      className="rounded accent-[#4573d2]"
-                    />
-                    <span>Projects</span>
-                  </label>
-                  <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] cursor-pointer text-[#f5f4f3]">
-                    <input
-                      type="checkbox"
-                      checked={columnVisibility.dueDate}
-                      onChange={(e) =>
-                        setColumnVisibility((prev) => ({ ...prev, dueDate: e.target.checked }))
-                      }
-                      className="rounded accent-[#4573d2]"
-                    />
-                    <span>Due date</span>
-                  </label>
-                  <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] cursor-pointer text-[#f5f4f3]">
-                    <input
-                      type="checkbox"
-                      checked={columnVisibility.priority}
-                      onChange={(e) =>
-                        setColumnVisibility((prev) => ({ ...prev, priority: e.target.checked }))
-                      }
-                      className="rounded accent-[#4573d2]"
-                    />
-                    <span>Priority</span>
-                  </label>
-                  <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] cursor-pointer text-[#f5f4f3]">
-                    <input
-                      type="checkbox"
-                      checked={columnVisibility.visibility}
-                      onChange={(e) =>
-                        setColumnVisibility((prev) => ({ ...prev, visibility: e.target.checked }))
-                      }
-                      className="rounded accent-[#4573d2]"
-                    />
-                    <span>Task visibility</span>
-                  </label>
+
+                  {/* Rule Row */}
+                  <div className="flex items-center gap-2 py-1 relative">
+                    {/* Six-dot grip handle */}
+                    <GripVertical className="w-4 h-4 text-[#6d6c6e] cursor-grab shrink-0" />
+
+                    {/* Group Field Selector */}
+                    <div className="relative flex-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsGroupFieldPickerOpen((prev) => !prev);
+                          setIsGroupOrderPickerOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between bg-[#252628] border border-[#37383b] hover:border-[#525357] rounded-lg px-3 py-1.5 text-[13px] text-white transition-colors"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <Layers className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>
+                            {groupField === 'section' && 'Sections'}
+                            {groupField === 'start_date' && 'Start date'}
+                            {groupField === 'due_date' && 'Due date'}
+                            {groupField === 'created_by' && 'Created by'}
+                            {groupField === 'created_on' && 'Created on'}
+                            {groupField === 'last_modified' && 'Last modified on'}
+                            {groupField === 'completed_on' && 'Completed on'}
+                            {groupField === 'project' && 'Project'}
+                            {groupField === 'none' && 'None'}
+                          </span>
+                        </div>
+                        <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                      </button>
+
+                      {/* Group Field Dropdown List (Image 4) */}
+                      {isGroupFieldPickerOpen && (
+                        <div className="absolute left-0 top-full mt-1 w-56 bg-[#252628] border border-[#37383b] rounded-xl shadow-2xl py-1 z-50 text-[13px]">
+                          {[
+                            { id: 'section', label: 'Sections', icon: Layers },
+                            { id: 'start_date', label: 'Start date', icon: CalendarIcon },
+                            { id: 'due_date', label: 'Due date', icon: CalendarIcon },
+                            { id: 'created_by', label: 'Created by', icon: User },
+                            { id: 'created_on', label: 'Created on', icon: Clock },
+                            { id: 'last_modified', label: 'Last modified on', icon: Clock },
+                            { id: 'completed_on', label: 'Completed on', icon: Clock },
+                            { id: 'project', label: 'Project', icon: ClipboardList },
+                          ].map((gf) => {
+                            const GIcon = gf.icon;
+                            const isCur = groupField === gf.id;
+
+                            return (
+                              <button
+                                key={gf.id}
+                                onClick={() => {
+                                  setGroupField(gf.id);
+                                  setIsGroupFieldPickerOpen(false);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-white hover:bg-[#2f3135] transition-colors"
+                              >
+                                <GIcon className="w-4 h-4 text-[#8a8886]" />
+                                <span>{gf.label}</span>
+                                {isCur && <Check className="w-3.5 h-3.5 text-[#4573d2] ml-auto" />}
+                              </button>
+                            );
+                          })}
+                          <div className="border-t border-[#37383b] mt-1 pt-1">
+                            <button
+                              onClick={() => {
+                                alert('Add custom field popup');
+                                setIsGroupFieldPickerOpen(false);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#8a8886] hover:text-white hover:bg-[#2f3135] transition-colors"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Add custom field</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Order Selector */}
+                    <div className="relative w-36">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsGroupOrderPickerOpen((prev) => !prev);
+                          setIsGroupFieldPickerOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between bg-[#252628] border border-[#37383b] hover:border-[#525357] rounded-lg px-3 py-1.5 text-[13px] text-white transition-colors"
+                      >
+                        <span className="truncate">{groupOrder}</span>
+                        <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                      </button>
+
+                      {isGroupOrderPickerOpen && (
+                        <div className="absolute right-0 top-full mt-1 w-36 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-50 text-[12.5px]">
+                          {['Custom order', 'Ascending', 'Descending'].map((ord) => (
+                            <button
+                              key={ord}
+                              onClick={() => {
+                                setGroupOrder(ord);
+                                setIsGroupOrderPickerOpen(false);
+                              }}
+                              className="w-full text-left px-3 py-1.5 hover:bg-[#2f3135] text-white"
+                            >
+                              {ord}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* More button */}
+                    <button
+                      onClick={() => alert('Additional group settings')}
+                      className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#28292c]"
+                      title="More options"
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+
+                    {/* Clear button */}
+                    <button
+                      onClick={() => setGroupField('none')}
+                      className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#28292c]"
+                      title="Remove grouping"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Add subgroup */}
+                  <div className="mt-3 pt-2">
+                    <button
+                      onClick={() => alert('Add subgroup')}
+                      className="flex items-center gap-1.5 text-[12.5px] text-[#8a8886] hover:text-white transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add subgroup</span>
+                      <ChevronDown className="w-3 h-3 opacity-70" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
+
+            {/* 4. OPTIONS BUTTON (Image 5) */}
+            <button
+              onClick={() => setIsListOptionsDrawerOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:text-white hover:bg-[#28292c] transition-colors"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Options</span>
+            </button>
 
             {/* Search Input Box */}
             <div className="relative flex items-center">
@@ -736,36 +986,36 @@ export default function MyTasksPage() {
                 </div>
               </div>
 
-              {/* Task Complete Checkbox Spacer */}
+              {/* Complete status spacer */}
               <div className="w-[24px] shrink-0" />
 
-              {/* Name Column */}
-              <div className="flex-1 min-w-[200px] pr-4">Task Name</div>
+              {/* Task Name Column */}
+              <div className="flex-1 min-w-[200px] pr-4">Name</div>
 
               {/* Projects Column */}
-              {columnVisibility.project && (
+              {columns.project && (
                 <div className="w-[170px] hidden md:block px-2">Projects</div>
               )}
 
               {/* Due Date Column */}
-              {columnVisibility.dueDate && (
+              {columns.dueDate && (
                 <div className="w-[130px] hidden sm:block px-2">Due Date</div>
               )}
 
               {/* Priority Column */}
-              {columnVisibility.priority && (
+              {columns.priority && (
                 <div className="w-[110px] hidden md:block px-2">Priority</div>
               )}
 
               {/* Task Visibility Column */}
-              {columnVisibility.visibility && (
+              {columns.visibility && (
                 <div className="w-[130px] hidden lg:block px-2">Task visibility</div>
               )}
 
-              {/* Actions Header Spacer */}
+              {/* Add column button in header */}
               <div className="w-[60px] flex items-center justify-center">
                 <button
-                  onClick={() => setIsOptionsMenuOpen((prev) => !prev)}
+                  onClick={() => setIsListOptionsDrawerOpen(true)}
                   className="p-1 hover:text-white rounded hover:bg-[#28292c]"
                   title="Customize columns"
                 >
@@ -819,7 +1069,7 @@ export default function MyTasksPage() {
                       </div>
 
                       {/* Section hover menu */}
-                      <div className="relative flex items-center opacity-0 group-hover:opacity-100 transition-opacity" data-dropdown>
+                      <div className="relative flex items-center opacity-0 group-hover:opacity-100 transition-opacity" data-popover>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -888,10 +1138,10 @@ export default function MyTasksPage() {
                             task={task}
                             isSelected={selectedTaskIds.has(task.id)}
                             onToggleSelect={() => handleToggleSelectTask(task.id)}
-                            showProjectColumn={columnVisibility.project}
-                            showDueDateColumn={columnVisibility.dueDate}
-                            showPriorityColumn={columnVisibility.priority}
-                            showVisibilityColumn={columnVisibility.visibility}
+                            showProjectColumn={columns.project}
+                            showDueDateColumn={columns.dueDate}
+                            showPriorityColumn={columns.priority}
+                            showVisibilityColumn={columns.visibility}
                             onMoveSection={(sec) => updateTask(task.id, { myTasksSection: sec })}
                           />
                         ))}
@@ -930,7 +1180,7 @@ export default function MyTasksPage() {
                             className="flex items-center gap-2 h-[34px] px-10 text-[12px] text-[#8a8886] hover:text-white hover:bg-[#252628] w-full text-left transition-colors"
                           >
                             <Plus className="w-3.5 h-3.5 text-[#6d6c6e]" />
-                            <span>Add task...</span>
+                            <span>Add task</span>
                           </button>
                         )}
                       </div>
@@ -940,7 +1190,7 @@ export default function MyTasksPage() {
               })}
 
               {/* Add section button / input */}
-              {groupMode === 'section' && (
+              {groupField === 'section' && (
                 <div className="px-4 py-3">
                   {isAddingSection ? (
                     <div className="flex items-center gap-2 max-w-sm">
@@ -1093,6 +1343,20 @@ export default function MyTasksPage() {
           </button>
         </div>
       )}
+
+      {/* Right-side List Options Drawer (Image 5) */}
+      <ListOptionsDrawer
+        isOpen={isListOptionsDrawerOpen}
+        onClose={() => setIsListOptionsDrawerOpen(false)}
+        columns={columns}
+        onToggleColumn={handleToggleColumn}
+        filterMode={filterMode}
+        onFilterModeChange={(m) => setFilterMode(m)}
+        sortMode={sortField}
+        onSortModeChange={(s) => setSortField(s)}
+        groupMode={groupField}
+        onGroupModeChange={(g) => setGroupField(g)}
+      />
     </div>
   );
 }
