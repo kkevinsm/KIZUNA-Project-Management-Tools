@@ -37,7 +37,7 @@ export interface ChartConfig {
   aggregation: string;
   unitOfTime?: 'Default' | 'Minutes' | 'Hours' | 'Days' | 'Weeks' | 'Months' | 'Years';
   size: 'kpi' | 'large';
-  colSpan?: 1 | 2;
+  colSpan?: 1 | 2 | 3 | 4;
   textContent?: string;
   xAxis?: string;
   groupBy?: string;
