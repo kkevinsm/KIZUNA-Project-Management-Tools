@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Plus,
   Check,
   MoreHorizontal,
-  Calendar,
+  Calendar as CalendarIcon,
   Diamond,
   UserCheck,
   Filter,
@@ -22,16 +22,26 @@ import {
   Minimize2,
   Zap,
   ChevronRight,
+  ChevronDown,
   Eye,
   EyeOff,
   MessageSquare,
   Sparkles,
   Info,
   Edit3,
+  GripVertical,
+  Clock,
+  ThumbsUp,
+  Type,
+  ClipboardList,
+  ArrowUp,
+  ArrowDown,
+  User,
 } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { useApp } from '@/context/AppContext';
 import AddTaskSplitButton from '@/components/tasks/AddTaskSplitButton';
+import ListOptionsDrawer from '@/components/tasks/ListOptionsDrawer';
 
 interface TaskBoardProps {
   sections: string[];
@@ -110,30 +120,68 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'above' | 'below'>('below');
 
-  // Toolbar state: Filter, Sort, Search
-  const [filterMode, setFilterMode] = useState<'all' | 'incomplete' | 'completed'>('all');
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [sortField, setSortField] = useState<'none' | 'alphabetical' | 'dueDate' | 'priority'>('none');
-  const [isSortOpen, setIsSortOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // ================= 1. FILTER STATE (Matching List & Calendar) =================
+  const [filterMode, setFilterMode] = useState<
+    'all' | 'incomplete' | 'completed' | 'due_this_week' | 'due_next_week'
+  >('all');
+  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+  const [isCompletedTasksSubmenuOpen, setIsCompletedTasksSubmenuOpen] = useState(false);
+  const [isAddFilterMenuOpen, setIsAddFilterMenuOpen] = useState(false);
 
-  // Close menus when clicking outside
+  // ================= 2. SORT STATE (Matching List & Calendar) =================
+  const [sortField, setSortField] = useState<string>('none');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [isSortPopoverOpen, setIsSortPopoverOpen] = useState(false);
+
+  // ================= 3. GROUP STATE (Matching List & Calendar) =================
+  const [groupField, setGroupField] = useState<string>('section');
+  const [groupOrder, setGroupOrder] = useState<'Ascending' | 'Descending' | 'Custom order'>('Custom order');
+  const [isGroupPopoverOpen, setIsGroupPopoverOpen] = useState(false);
+  const [isGroupFieldPickerOpen, setIsGroupFieldPickerOpen] = useState(false);
+  const [isGroupOrderPickerOpen, setIsGroupOrderPickerOpen] = useState(false);
+  const [isGroupMoreMenuOpen, setIsGroupMoreMenuOpen] = useState(false);
+  const [showEmptyGroups, setShowEmptyGroups] = useState(true);
+
+  // ================= 4. OPTIONS DRAWER STATE =================
+  const [isListOptionsDrawerOpen, setIsListOptionsDrawerOpen] = useState(false);
+  const [boardVisibleFields, setBoardVisibleFields] = useState<Record<string, boolean>>({
+    dueDate: true,
+    project: true,
+    collaborators: false,
+    priority: true,
+    status: false,
+  });
+
+  // ================= 5. SEARCH STATE =================
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  // Close toolbar popovers when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setIsFilterPopoverOpen(false);
+        setIsSortPopoverOpen(false);
+        setIsGroupPopoverOpen(false);
+        setIsCompletedTasksSubmenuOpen(false);
+        setIsAddFilterMenuOpen(false);
+        setIsGroupFieldPickerOpen(false);
+        setIsGroupOrderPickerOpen(false);
+        setIsGroupMoreMenuOpen(false);
+      }
       if (sectionMenuRef.current && !sectionMenuRef.current.contains(e.target as Node)) {
         setOpenSectionMenu(null);
         setActiveSubmenu(null);
         setIsDeleteHovered(false);
       }
     };
-    if (openSectionMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [openSectionMenu]);
+  }, []);
 
   // Keyboard shortcut: Tab + N to add section in Board view
   useEffect(() => {
@@ -160,30 +208,114 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
     };
   }, []);
 
-  // Filter & Sort tasks
-  const filteredTasks = tasks.filter((t) => {
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      if (!t.name.toLowerCase().includes(q)) return false;
-    }
-    if (filterMode === 'incomplete') return !t.completed;
-    if (filterMode === 'completed') return t.completed;
-    return true;
-  });
+  // Filter tasks
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      if (filterMode === 'incomplete' && t.completed) return false;
+      if (filterMode === 'completed' && !t.completed) return false;
+      if (filterMode === 'due_this_week') {
+        const due = (t.dueDate || '').toLowerCase();
+        if (!due || due.includes('later')) return false;
+      }
+      if (filterMode === 'due_next_week') {
+        const due = (t.dueDate || '').toLowerCase();
+        if (!due.includes('nov 10') && !due.includes('next week')) return false;
+      }
 
-  const getSortedTasks = (colTasks: Task[]) => {
-    if (sortField === 'alphabetical') {
-      return [...colTasks].sort((a, b) => a.name.localeCompare(b.name));
+      if (searchKeyword.trim()) {
+        const q = searchKeyword.toLowerCase();
+        const matchesName = t.name.toLowerCase().includes(q);
+        const matchesProject = (t.projectName || '').toLowerCase().includes(q);
+        if (!matchesName && !matchesProject) return false;
+      }
+
+      return true;
+    });
+  }, [tasks, filterMode, searchKeyword]);
+
+  // Sort tasks
+  const sortedTasks = useMemo(() => {
+    const list = [...filteredTasks];
+    if (sortField === 'none') return list;
+
+    list.sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'due_date' || sortField === 'start_date') {
+        comparison = (a.dueDate || '').localeCompare(b.dueDate || '');
+      } else if (sortField === 'alphabetical') {
+        comparison = a.name.localeCompare(b.name);
+      } else if (sortField === 'project') {
+        comparison = (a.projectName || '').localeCompare(b.projectName || '');
+      } else if (sortField === 'created_by') {
+        comparison = (a.assignee?.name || '').localeCompare(b.assignee?.name || '');
+      } else if (sortField === 'created_on') {
+        comparison = (a.createdAt || '').localeCompare(b.createdAt || '');
+      } else if (sortField === 'priority') {
+        const pWeights: Record<string, number> = { High: 3, Medium: 2, Low: 1 };
+        comparison = (pWeights[a.priority || ''] || 0) - (pWeights[b.priority || ''] || 0);
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return list;
+  }, [filteredTasks, sortField, sortDirection]);
+
+  // Group columns data based on groupField
+  const boardColumns = useMemo(() => {
+    // 1. Group by project
+    if (groupField === 'project') {
+      const projectMap = new Map<string, Task[]>();
+      sortedTasks.forEach((t) => {
+        const pName = t.projectName || "Kevin's first project";
+        if (!projectMap.has(pName)) projectMap.set(pName, []);
+        projectMap.get(pName)!.push(t);
+      });
+      let groups = Array.from(projectMap.entries()).map(([pName, pTasks]) => ({
+        columnTitle: pName,
+        id: pName,
+        tasks: pTasks,
+      }));
+      if (groupOrder === 'Descending') groups.reverse();
+      return groups;
     }
-    if (sortField === 'dueDate') {
-      return [...colTasks].sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+
+    // 2. Group by date
+    if (groupField === 'start_date' || groupField === 'due_date') {
+      let groups = [
+        { columnTitle: 'Before September 2026', id: 'before_sep', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('aug') || (t.dueDate || '').toLowerCase().includes('jul')) },
+        { columnTitle: 'September 2026', id: 'sep_2026', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('sep')) },
+        { columnTitle: 'October 2026', id: 'oct_2026', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('oct')) },
+        { columnTitle: 'Last 30 days', id: 'last_30_days', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('last 30')) },
+        { columnTitle: 'Last 7 days', id: 'last_7_days', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('last 7')) },
+        { columnTitle: 'Yesterday', id: 'yesterday', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('yesterday') || (t.dueDate || '').toLowerCase().includes('nov 2')) },
+        { columnTitle: 'Today', id: 'today', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('today') || (t.dueDate || '').toLowerCase().includes('nov 3')) },
+        { columnTitle: 'Upcoming', id: 'upcoming', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('nov 4') || (t.dueDate || '').toLowerCase().includes('nov 5') || (t.dueDate || '').toLowerCase().includes('nov 10')) },
+      ];
+      if (!showEmptyGroups) {
+        groups = groups.filter((g) => g.tasks.length > 0);
+      }
+      if (groupOrder === 'Descending') groups.reverse();
+      return groups;
     }
-    if (sortField === 'priority') {
-      const pWeights: Record<string, number> = { High: 3, Medium: 2, Low: 1 };
-      return [...colTasks].sort((a, b) => (pWeights[b.priority || ''] || 0) - (pWeights[a.priority || ''] || 0));
+
+    // 3. Group by none
+    if (groupField === 'none') {
+      return [{ columnTitle: 'All tasks', id: 'all', tasks: sortedTasks }];
     }
-    return colTasks;
-  };
+
+    // 4. Default: Group by Section
+    return boardSections.map((sec) => {
+      const secTasks = sortedTasks.filter((t) => {
+        const assignedSec = t.myTasksSection || (boardSections.includes(t.section) ? t.section : boardSections[0]);
+        return assignedSec === sec;
+      });
+      return {
+        columnTitle: sec,
+        id: sec,
+        tasks: secTasks,
+      };
+    });
+  }, [sortedTasks, groupField, groupOrder, showEmptyGroups, boardSections]);
 
   // Create task in specific section
   const handleCreateTask = (section: string, taskType: 'task' | 'milestone' | 'approval' = 'task') => {
@@ -236,7 +368,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
     setActiveSubmenu(null);
     setIsDeleteHovered(false);
 
-    // Immediately start renaming the newly created section
     setEditingSection(candidate);
     setEditingSectionValue(candidate);
   };
@@ -249,7 +380,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
       return;
     }
     setBoardSections((prev) => prev.map((s) => (s === oldName ? trimmed : s)));
-    // Update tasks with that section
     tasks.forEach((t) => {
       if (t.section === oldName || t.myTasksSection === oldName) {
         updateTask(t.id, { section: trimmed, myTasksSection: trimmed });
@@ -263,7 +393,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
     if (sectionName === 'Recently assigned') return;
     if (boardSections.length <= 1) return;
 
-    // Move tasks in deleted section to 'Recently assigned'
     tasks.forEach((t) => {
       if (t.section === sectionName || t.myTasksSection === sectionName) {
         updateTask(t.id, { section: 'Recently assigned', myTasksSection: 'Recently assigned' });
@@ -434,6 +563,11 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
     setDragOverCardId(null);
   };
 
+  // Active state booleans for Filter, Sort, Group (Matching Asana Screenshot)
+  const isFilterActive = filterMode !== 'all';
+  const isSortActive = sortField !== 'none';
+  const isGroupActive = groupField !== 'section' || groupOrder !== 'Custom order';
+
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1e1f21] select-none text-[#f5f4f3] overflow-hidden relative">
       {/* Toast Notification */}
@@ -443,15 +577,18 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
           <span>{toastMessage}</span>
           <button
             onClick={() => setToastMessage(null)}
-            className="ml-2 text-[#8a8886] hover:text-white transition-colors"
+            className="ml-2 text-[#8a8886] hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* 1. Asana Secondary Control Toolbar for Board */}
-      <div className="h-[46px] min-h-[46px] px-6 border-b border-[#262729] flex items-center justify-between text-[13px] bg-[#1e1f21] shrink-0 relative z-50">
+      {/* 1. Asana Secondary Control Toolbar for Board (Matching List and Calendar Exactly) */}
+      <div
+        ref={toolbarRef}
+        className="h-[46px] min-h-[46px] px-6 border-b border-[#262729] flex items-center justify-between text-[13px] bg-[#1e1f21] shrink-0 relative z-50"
+      >
         {/* Left Side: + Add task split button */}
         <div className="flex items-center gap-3">
           <AddTaskSplitButton
@@ -482,136 +619,649 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
           />
         </div>
 
-        {/* Right Side Controls: Filter, Sort, Group, Options, Search */}
+        {/* Right Side Controls: Filter, Sort, Group, Options, Search (Matching Asana UI 1:1) */}
         <div className="flex items-center gap-2 text-[#bdbbb9] text-[12px]">
-          {/* FILTER BUTTON */}
+          {/* ================= 1. FILTER BUTTON ================= */}
           <div className="relative">
-            <button
-              onClick={() => {
-                setIsFilterOpen((prev) => !prev);
-                setIsSortOpen(false);
-              }}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
-                filterMode !== 'all'
-                  ? 'bg-[#0d3880] text-white border-[#1d4ea8]'
-                  : 'hover:bg-[#252628] border-transparent hover:border-[#383a3d]'
-              }`}
-            >
-              <Filter className="w-3.5 h-3.5" />
-              <span>Filter</span>
-            </button>
-
-            {isFilterOpen && (
-              <div className="absolute right-0 top-9 w-44 bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl py-1.5 z-50 text-[12.5px]">
-                <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider">
-                  Quick filters
-                </div>
-                {(['all', 'incomplete', 'completed'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => {
-                      setFilterMode(mode);
-                      setIsFilterOpen(false);
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#252628] text-left capitalize text-white cursor-pointer"
-                  >
-                    <span>{mode === 'all' ? 'All tasks' : `${mode} tasks`}</span>
-                    {filterMode === mode && <Check className="w-3.5 h-3.5 text-[#4573d2]" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* SORT BUTTON */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setIsSortOpen((prev) => !prev);
-                setIsFilterOpen(false);
-              }}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
-                sortField !== 'none'
-                  ? 'bg-[#0d3880] text-white border-[#1d4ea8]'
-                  : 'hover:bg-[#252628] border-transparent hover:border-[#383a3d]'
-              }`}
-            >
-              <ArrowUpDown className="w-3.5 h-3.5" />
-              <span>Sort</span>
-            </button>
-
-            {isSortOpen && (
-              <div className="absolute right-0 top-9 w-44 bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl py-1.5 z-50 text-[12.5px]">
-                <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider">
-                  Sort by
-                </div>
-                {[
-                  { field: 'none', label: 'None' },
-                  { field: 'dueDate', label: 'Due date' },
-                  { field: 'alphabetical', label: 'Alphabetical' },
-                  { field: 'priority', label: 'Priority' },
-                ].map(({ field, label }) => (
-                  <button
-                    key={field}
-                    onClick={() => {
-                      setSortField(field as any);
-                      setIsSortOpen(false);
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
-                  >
-                    <span>{label}</span>
-                    {sortField === field && <Check className="w-3.5 h-3.5 text-[#4573d2]" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* GROUP BUTTON */}
-          <button
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-[#252628] border border-transparent hover:border-[#383a3d] transition-colors"
-            title="Group by sections (Default)"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Group</span>
-          </button>
-
-          {/* OPTIONS BUTTON */}
-          <button
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-[#252628] border border-transparent hover:border-[#383a3d] transition-colors"
-            title="View options"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>Options</span>
-          </button>
-
-          {/* SEARCH ICON / INPUT */}
-          <div className="relative flex items-center">
-            {isSearchOpen ? (
-              <div className="flex items-center bg-[#252628] border border-[#383a3d] rounded-lg px-2 py-1 text-[12px]">
-                <Search className="w-3.5 h-3.5 text-[#8a8886] mr-1.5 shrink-0" />
-                <input
-                  type="text"
-                  autoFocus
-                  placeholder="Search in board..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-transparent text-white outline-none w-36 text-[12px] placeholder-[#8a8886]"
-                />
+            {isFilterActive ? (
+              <div className="inline-flex items-center bg-[#0d3880] text-white border border-[#1d4ea8] rounded-lg text-[12px] font-medium overflow-hidden shadow-xs">
                 <button
+                  type="button"
                   onClick={() => {
-                    setIsSearchOpen(false);
-                    setSearchQuery('');
+                    setIsFilterPopoverOpen((prev) => !prev);
+                    setIsSortPopoverOpen(false);
+                    setIsGroupPopoverOpen(false);
                   }}
-                  className="text-[#8a8886] hover:text-white ml-1"
+                  className="flex items-center gap-1.5 px-2.5 py-1 hover:bg-[#1147a3] transition-colors cursor-pointer"
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>Filters: 1</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilterMode('all');
+                  }}
+                  className="px-1.5 py-1 hover:bg-[#1147a3] border-l border-[#1d4ea8] text-[#a5c2f7] hover:text-white transition-colors cursor-pointer"
+                  title="Clear filter"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             ) : (
               <button
-                onClick={() => setIsSearchOpen(true)}
-                className="p-1.5 rounded-lg hover:bg-[#252628] text-[#bdbbb9] hover:text-white transition-colors"
+                type="button"
+                onClick={() => {
+                  setIsFilterPopoverOpen((prev) => !prev);
+                  setIsSortPopoverOpen(false);
+                  setIsGroupPopoverOpen(false);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  isFilterPopoverOpen
+                    ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
+                    : 'hover:text-white hover:bg-[#28292c]'
+                }`}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                <span>Filter</span>
+              </button>
+            )}
+
+            {/* Filter Popover */}
+            {isFilterPopoverOpen && (
+              <div className="absolute right-0 top-8.5 w-[420px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl p-4 z-50 text-[13px] animate-in fade-in duration-150">
+                <div className="flex items-center justify-between pb-3">
+                  <span className="font-bold text-white text-[14px]">Filters</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode('all')}
+                    className="text-[12px] text-[#8a8886] hover:text-white transition-colors cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[11.5px] font-medium text-[#8a8886] block">
+                    Quick filters
+                  </span>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Incomplete tasks */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilterMode(filterMode === 'incomplete' ? 'all' : 'incomplete')
+                      }
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors cursor-pointer ${
+                        filterMode === 'incomplete'
+                          ? 'bg-[#252628] border-[#3b3d42] text-white'
+                          : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
+                      }`}
+                    >
+                      <Check className="w-3 h-3 text-[#4573d2]" />
+                      <span>Incomplete tasks</span>
+                    </button>
+
+                    {/* Completed tasks dropdown */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFilterMode('completed');
+                          setIsCompletedTasksSubmenuOpen((prev) => !prev);
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors cursor-pointer ${
+                          filterMode === 'completed'
+                            ? 'bg-[#252628] border-[#3b3d42] text-white'
+                            : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
+                        }`}
+                      >
+                        <Check className="w-3 h-3 text-[#4573d2]" />
+                        <span>Completed tasks</span>
+                        <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
+                      </button>
+
+                      {isCompletedTasksSubmenuOpen && (
+                        <div className="absolute left-0 top-full mt-1 w-44 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-50 text-[12px]">
+                          {['All completed', 'Completed today', 'Completed this week'].map((item) => (
+                            <button
+                              key={item}
+                              type="button"
+                              onClick={() => {
+                                setFilterMode('completed');
+                                setIsCompletedTasksSubmenuOpen(false);
+                              }}
+                              className="w-full text-left px-3 py-1.5 hover:bg-[#2f3135] text-white cursor-pointer"
+                            >
+                              {item}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Due this week */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilterMode(filterMode === 'due_this_week' ? 'all' : 'due_this_week')
+                      }
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors cursor-pointer ${
+                        filterMode === 'due_this_week'
+                          ? 'bg-[#252628] border-[#3b3d42] text-white'
+                          : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
+                      }`}
+                    >
+                      <CalendarIcon className="w-3.5 h-3.5" />
+                      <span>Due this week</span>
+                    </button>
+
+                    {/* Due next week */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilterMode(filterMode === 'due_next_week' ? 'all' : 'due_next_week')
+                      }
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors cursor-pointer ${
+                        filterMode === 'due_next_week'
+                          ? 'bg-[#252628] border-[#3b3d42] text-white'
+                          : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
+                      }`}
+                    >
+                      <CalendarIcon className="w-3.5 h-3.5" />
+                      <span>Due next week</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* + Add filter dropdown */}
+                <div className="mt-4 pt-3 border-t border-[#2b2c2e] relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddFilterMenuOpen((prev) => !prev)}
+                    className="flex items-center gap-1.5 text-[12.5px] text-[#8a8886] hover:text-white transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add filter</span>
+                    <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
+                  </button>
+
+                  {isAddFilterMenuOpen && (
+                    <div className="absolute left-0 top-full mt-1 w-48 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-50 text-[12.5px]">
+                      {[
+                        { id: 'completion', label: 'Completion status' },
+                        { id: 'created_by', label: 'Created by' },
+                        { id: 'created_on', label: 'Created on' },
+                        { id: 'last_modified', label: 'Last modified on' },
+                        { id: 'completed_on', label: 'Completed on' },
+                        { id: 'task_type', label: 'Task type' },
+                      ].map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => {
+                            setIsAddFilterMenuOpen(false);
+                            setIsListOptionsDrawerOpen(true);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-[#f5f4f3] hover:bg-[#2f3135] transition-colors cursor-pointer"
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ================= 2. SORT BUTTON (Matching User Screenshot Exactly) ================= */}
+          <div className="relative">
+            {isSortActive ? (
+              <div className="inline-flex items-center bg-[#0d3880] text-white border border-[#1d4ea8] rounded-lg text-[12px] font-medium overflow-hidden shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSortPopoverOpen((prev) => !prev);
+                    setIsFilterPopoverOpen(false);
+                    setIsGroupPopoverOpen(false);
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 hover:bg-[#1147a3] transition-colors cursor-pointer"
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                  <span>Sorts: 1</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSortField('none');
+                  }}
+                  className="px-1.5 py-1 hover:bg-[#1147a3] border-l border-[#1d4ea8] text-[#a5c2f7] hover:text-white transition-colors cursor-pointer"
+                  title="Clear sort"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSortPopoverOpen((prev) => !prev);
+                  setIsFilterPopoverOpen(false);
+                  setIsGroupPopoverOpen(false);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  isSortPopoverOpen
+                    ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
+                    : 'hover:text-white hover:bg-[#28292c]'
+                }`}
+              >
+                <ArrowUpDown className="w-3.5 h-3.5" />
+                <span>Sort</span>
+              </button>
+            )}
+
+            {/* Sort Popover */}
+            {isSortPopoverOpen && (
+              <div className="absolute right-0 top-8.5 w-56 bg-[#252628] border border-[#37383b] rounded-xl shadow-2xl py-1.5 z-50 text-[13px] animate-in fade-in duration-150">
+                {[
+                  { id: 'start_date', label: 'Start date', icon: CalendarIcon },
+                  { id: 'due_date', label: 'Due date', icon: CalendarIcon },
+                  { id: 'created_by', label: 'Created by', icon: User },
+                  { id: 'created_on', label: 'Created on', icon: Clock },
+                  { id: 'last_modified', label: 'Last modified on', icon: Clock },
+                  { id: 'completed_on', label: 'Completed on', icon: Clock },
+                  { id: 'likes', label: 'Likes', icon: ThumbsUp },
+                  { id: 'alphabetical', label: 'Alphabetical', icon: Type },
+                  { id: 'project', label: 'Project', icon: ClipboardList },
+                ].map((item) => {
+                  const IconComp = item.icon;
+                  const isSelected = sortField === item.id;
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) {
+                          setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                        } else {
+                          setSortField(item.id);
+                          setSortDirection('asc');
+                        }
+                        setIsSortPopoverOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between px-3.5 py-2 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <IconComp className="w-4 h-4 text-[#8a8886]" />
+                        <span>{item.label}</span>
+                      </div>
+                      {isSelected && (
+                        <span className="text-[11px] text-[#4573d2] font-semibold">
+                          {sortDirection === 'asc' ? '↑ Asc' : '↓ Desc'}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+
+                {sortField !== 'none' && (
+                  <div className="pt-1 mt-1 border-t border-[#37383b]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSortField('none');
+                        setIsSortPopoverOpen(false);
+                      }}
+                      className="w-full px-3.5 py-1.5 text-left text-[12px] text-[#ff6b72] hover:bg-[#2f3135] transition-colors cursor-pointer"
+                    >
+                      Clear sort
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ================= 3. GROUP BUTTON ================= */}
+          <div className="relative">
+            {isGroupActive ? (
+              <div className="inline-flex items-center bg-[#0d3880] text-white border border-[#1d4ea8] rounded-lg text-[12px] font-medium overflow-hidden shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsGroupPopoverOpen((prev) => !prev);
+                    setIsFilterPopoverOpen(false);
+                    setIsSortPopoverOpen(false);
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 hover:bg-[#1147a3] transition-colors cursor-pointer"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Groups: 1</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGroupField('section');
+                    setGroupOrder('Custom order');
+                  }}
+                  className="px-1.5 py-1 hover:bg-[#1147a3] border-l border-[#1d4ea8] text-[#a5c2f7] hover:text-white transition-colors cursor-pointer"
+                  title="Clear group"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsGroupPopoverOpen((prev) => !prev);
+                  setIsFilterPopoverOpen(false);
+                  setIsSortPopoverOpen(false);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  isGroupPopoverOpen
+                    ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
+                    : 'hover:text-white hover:bg-[#28292c]'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Group</span>
+              </button>
+            )}
+
+            {/* Group Popover */}
+            {isGroupPopoverOpen && (
+              <div className="absolute right-0 top-8.5 w-[420px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl p-4 z-50 text-[13px] animate-in fade-in duration-150">
+                <div className="flex items-center justify-between pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-[14px]">Groups</span>
+                    <button
+                      type="button"
+                      onClick={() => showToast('Feedback submitted! Thank you.')}
+                      className="text-[12px] text-[#8b5cf6] hover:underline cursor-pointer"
+                    >
+                      Send feedback
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGroupField('none');
+                      setGroupOrder('Custom order');
+                    }}
+                    className="text-[12px] text-[#8a8886] hover:text-white transition-colors cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 py-1 relative">
+                  <GripVertical className="w-4 h-4 text-[#6d6c6e] cursor-grab shrink-0" />
+
+                  {/* Group Field Selector */}
+                  <div className="relative flex-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsGroupFieldPickerOpen((prev) => !prev);
+                        setIsGroupOrderPickerOpen(false);
+                        setIsGroupMoreMenuOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between bg-[#252628] border border-[#37383b] hover:border-[#525357] rounded-lg px-3 py-1.5 text-[13px] text-white transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Layers className="w-3.5 h-3.5 text-[#8a8886]" />
+                        <span>
+                          {groupField === 'section' && 'Sections'}
+                          {groupField === 'start_date' && 'Start date'}
+                          {groupField === 'due_date' && 'Due date'}
+                          {groupField === 'created_by' && 'Created by'}
+                          {groupField === 'created_on' && 'Created on'}
+                          {groupField === 'last_modified' && 'Last modified on'}
+                          {groupField === 'completed_on' && 'Completed on'}
+                          {groupField === 'project' && 'Project'}
+                          {groupField === 'none' && 'None'}
+                        </span>
+                      </div>
+                      <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                    </button>
+
+                    {isGroupFieldPickerOpen && (
+                      <div className="absolute left-0 top-full mt-1 w-56 bg-[#252628] border border-[#37383b] rounded-xl shadow-2xl py-1 z-50 text-[13px]">
+                        {[
+                          { id: 'none', label: 'None', icon: SlidersHorizontal },
+                          { id: 'section', label: 'Sections', icon: Layers },
+                          { id: 'start_date', label: 'Start date', icon: CalendarIcon },
+                          { id: 'due_date', label: 'Due date', icon: CalendarIcon },
+                          { id: 'created_by', label: 'Created by', icon: User },
+                          { id: 'created_on', label: 'Created on', icon: Clock },
+                          { id: 'last_modified', label: 'Last modified on', icon: Clock },
+                          { id: 'completed_on', label: 'Completed on', icon: Clock },
+                          { id: 'project', label: 'Project', icon: ClipboardList },
+                        ].map((gf) => {
+                          const GIcon = gf.icon;
+                          const isCur = groupField === gf.id;
+
+                          return (
+                            <button
+                              key={gf.id}
+                              type="button"
+                              onClick={() => {
+                                setGroupField(gf.id);
+                                if (gf.id === 'section') {
+                                  setGroupOrder('Custom order');
+                                } else {
+                                  setGroupOrder('Ascending');
+                                }
+                                setIsGroupFieldPickerOpen(false);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-white hover:bg-[#2f3135] transition-colors cursor-pointer"
+                            >
+                              <GIcon className="w-4 h-4 text-[#8a8886]" />
+                              <span>{gf.label}</span>
+                              {isCur && <Check className="w-3.5 h-3.5 text-[#4573d2] ml-auto" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Order Selector */}
+                  <div className="relative w-36">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsGroupOrderPickerOpen((prev) => !prev);
+                        setIsGroupFieldPickerOpen(false);
+                        setIsGroupMoreMenuOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between bg-[#252628] border border-[#37383b] hover:border-[#525357] rounded-lg px-2.5 py-1.5 text-[13px] text-white transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        {groupOrder === 'Ascending' ? (
+                          <ArrowUp className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
+                        ) : groupOrder === 'Descending' ? (
+                          <ArrowDown className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
+                        ) : null}
+                        <span className="truncate">{groupOrder}</span>
+                      </div>
+                      <ChevronDown className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
+                    </button>
+
+                    {isGroupOrderPickerOpen && (
+                      <div className="absolute right-0 top-full mt-1 w-36 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-50 text-[12.5px]">
+                        {groupField === 'section' ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGroupOrder('Custom order');
+                              setIsGroupOrderPickerOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-1.5 hover:bg-[#2f3135] text-white cursor-pointer"
+                          >
+                            Custom order
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setGroupOrder('Ascending');
+                                setIsGroupOrderPickerOpen(false);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-white cursor-pointer"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5 text-[#8a8886]" />
+                              <span>Ascending</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setGroupOrder('Descending');
+                                setIsGroupOrderPickerOpen(false);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-white cursor-pointer"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                              <span>Descending</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* More options button */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsGroupMoreMenuOpen((prev) => !prev);
+                        setIsGroupOrderPickerOpen(false);
+                        setIsGroupFieldPickerOpen(false);
+                      }}
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                        isGroupMoreMenuOpen
+                          ? 'bg-[#323336] text-white'
+                          : 'text-[#8a8886] hover:text-white hover:bg-[#28292c]'
+                      }`}
+                      title="More options"
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+
+                    {isGroupMoreMenuOpen && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-[#252628] border border-[#37383b] rounded-xl shadow-2xl py-1.5 z-50 text-[12.5px]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowEmptyGroups(false);
+                            setIsGroupMoreMenuOpen(false);
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left text-white transition-colors cursor-pointer"
+                        >
+                          <span>Hide empty groups</span>
+                          {!showEmptyGroups && <Check className="w-3.5 h-3.5 text-[#4573d2]" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowEmptyGroups(true);
+                            setIsGroupMoreMenuOpen(false);
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left text-white transition-colors cursor-pointer"
+                        >
+                          <span>Show empty groups</span>
+                          {showEmptyGroups && <Check className="w-3.5 h-3.5 text-[#4573d2]" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Clear button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGroupField('section');
+                      setGroupOrder('Custom order');
+                    }}
+                    className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#28292c] cursor-pointer"
+                    title="Remove grouping"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="mt-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => showToast('Subgroup feature opened')}
+                    className="flex items-center gap-1.5 text-[12.5px] text-[#8a8886] hover:text-white transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add subgroup</span>
+                    <ChevronDown className="w-3 h-3 opacity-70" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ================= 4. OPTIONS BUTTON ================= */}
+          <button
+            type="button"
+            onClick={() => setIsListOptionsDrawerOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:text-white hover:bg-[#28292c] transition-colors cursor-pointer"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>Options</span>
+          </button>
+
+          {/* ================= 5. SEARCH INPUT ================= */}
+          <div className="relative flex items-center">
+            {isSearchExpanded ? (
+              <div className="flex items-center bg-[#252628] border border-[#383a3d] rounded-lg px-2 py-0.5 text-[12px]">
+                <Search className="w-3.5 h-3.5 text-[#8a8886] mr-1.5 shrink-0" />
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Search in board..."
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  className="bg-transparent text-white outline-none w-32 md:w-44 text-[12px] placeholder-[#8a8886]"
+                />
+                {searchKeyword && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchKeyword('')}
+                    className="text-[#8a8886] hover:text-white ml-1 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSearchExpanded(false);
+                    setSearchKeyword('');
+                  }}
+                  className="text-[#8a8886] hover:text-white ml-1.5 text-[11px] cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsSearchExpanded(true)}
+                className="p-1.5 rounded-lg hover:bg-[#28292c] text-[#bdbbb9] hover:text-white transition-colors cursor-pointer"
                 title="Search tasks"
               >
                 <Search className="w-3.5 h-3.5" />
@@ -623,12 +1273,10 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
 
       {/* 2. Board Columns Area with Horizontal Scroll */}
       <div className="flex-1 flex gap-4 px-6 py-4 overflow-x-auto h-full items-start">
-        {boardSections.map((section, sectionIdx) => {
+        {boardColumns.map((colGroup, colIdx) => {
+          const section = colGroup.columnTitle;
           const isCollapsed = !!collapsedSections[section];
-          const rawColumnTasks = filteredTasks.filter(
-            (t) => (t.myTasksSection || t.section || boardSections[0]) === section
-          );
-          const columnTasks = getSortedTasks(rawColumnTasks);
+          const columnTasks = colGroup.tasks;
           const isDragOverThisCol = dragOverSection === section && dragOverCardId === null;
 
           // If hideAllEmptyColumns is active and column is empty, hide it
@@ -640,12 +1288,11 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
           if (isCollapsed) {
             return (
               <div
-                key={section}
+                key={colGroup.id}
                 onClick={() => toggleCollapse(section)}
                 className="w-[42px] min-w-[42px] bg-[#252628] hover:bg-[#2a2b2e] border border-[#323438] hover:border-[#45474c] rounded-xl py-3 flex flex-col items-center justify-between cursor-pointer transition-all h-[calc(100vh-180px)] select-none shadow-sm"
                 title={`Expand ${section}`}
               >
-                {/* Expand button on top */}
                 <button
                   type="button"
                   className="p-1 rounded text-[#8a8886] hover:text-white transition-colors"
@@ -653,7 +1300,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                   <Maximize2 className="w-3.5 h-3.5" />
                 </button>
 
-                {/* Vertical title */}
                 <div
                   className="text-[13px] font-semibold text-white tracking-wide whitespace-nowrap"
                   style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
@@ -661,7 +1307,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                   {section}
                 </div>
 
-                {/* Count badge */}
                 <span className="text-[11px] font-semibold text-[#8a8886] bg-[#1e1f21] px-1.5 py-0.5 rounded-full">
                   {columnTasks.length}
                 </span>
@@ -671,11 +1316,11 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
 
           // ================= EXPANDED COLUMN =================
           const isRecentlyAssigned = section === 'Recently assigned';
-          const isNearRightEdge = sectionIdx >= boardSections.length - 2;
+          const isNearRightEdge = colIdx >= boardColumns.length - 2;
 
           return (
             <div
-              key={section}
+              key={colGroup.id}
               onDragOver={(e) => handleDragOverColumn(e, section)}
               onDrop={(e) => handleDropOnColumn(e, section)}
               className={`w-[290px] min-w-[290px] max-w-[290px] flex flex-col max-h-full transition-all duration-150 ${
@@ -716,7 +1361,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                     <button
                       type="button"
                       onClick={() => toggleCollapse(section)}
-                      className="p-1 rounded hover:bg-[#343538] hover:text-white transition-colors"
+                      className="p-1 rounded hover:bg-[#343538] hover:text-white transition-colors cursor-pointer"
                       title="Collapse section"
                     >
                       <svg
@@ -738,7 +1383,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                     <button
                       type="button"
                       onClick={() => setActiveNewSection(section)}
-                      className="p-1 rounded hover:bg-[#343538] hover:text-white transition-colors"
+                      className="p-1 rounded hover:bg-[#343538] hover:text-white transition-colors cursor-pointer"
                       title="Add task to this section"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -755,7 +1400,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                           setActiveSubmenu(null);
                           setIsDeleteHovered(false);
                         }}
-                        className={`p-1 rounded hover:bg-[#343538] hover:text-white transition-colors ${
+                        className={`p-1 rounded hover:bg-[#343538] hover:text-white transition-colors cursor-pointer ${
                           openSectionMenu === section ? 'bg-[#343538] text-white' : ''
                         }`}
                         title="Section actions"
@@ -790,7 +1435,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                               <ChevronRight className="w-3.5 h-3.5 text-[#8a8886] group-hover:text-white" />
                             </button>
 
-                            {/* Automation Submenu (Matching Asana Screenshot 2) */}
+                            {/* Automation Submenu */}
                             {activeSubmenu === 'automation' && (
                               <div
                                 className={`absolute top-0 w-[280px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl py-2 z-50 text-[13px] text-[#f5f4f3] animate-in fade-in duration-100 ${
@@ -799,7 +1444,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                                     : 'left-[calc(100%+6px)]'
                                 }`}
                               >
-                                {/* + New automation */}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -819,7 +1463,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                                   Suggested AI Studio automations
                                 </div>
 
-                                {/* Suggestion 1: Smart section sorting */}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -838,7 +1481,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                                   </div>
                                 </button>
 
-                                {/* Suggestion 2: Automatically name tasks */}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -857,7 +1499,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                                   </div>
                                 </button>
 
-                                {/* Suggestion 3: Summarize work that's been done */}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -878,7 +1519,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
 
                                 <div className="border-t border-[#313235] my-1.5" />
 
-                                {/* Info Footer */}
                                 <div className="px-3 py-1 flex items-start gap-2 text-[11px] text-[#8a8886]">
                                   <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#8a8886]" />
                                   <span className="leading-snug">
@@ -908,7 +1548,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                             <span className="text-[13px]">Rename section</span>
                           </button>
 
-                          {/* 3. Add section > (Matching Asana Screenshot 3) */}
+                          {/* 3. Add section > */}
                           <div
                             className="relative"
                             onMouseEnter={() => {
@@ -923,7 +1563,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                               }`}
                             >
                               <div className="flex items-center gap-2.5">
-                                {/* 3 lines section icon */}
                                 <svg
                                   className="w-4 h-4 text-[#8a8886] group-hover:text-white shrink-0"
                                   viewBox="0 0 16 16"
@@ -938,7 +1577,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                               <ChevronRight className="w-3.5 h-3.5 text-[#8a8886] group-hover:text-white" />
                             </button>
 
-                            {/* Add section submenu */}
                             {activeSubmenu === 'add_section' && (
                               <div
                                 className={`absolute top-0 w-[200px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl py-1.5 z-50 text-[13px] text-[#f5f4f3] animate-in fade-in duration-100 ${
@@ -949,7 +1587,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                               >
                                 <button
                                   type="button"
-                                  onClick={() => handleAddSectionAt(sectionIdx)}
+                                  onClick={() => handleAddSectionAt(colIdx)}
                                   className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
                                 >
                                   <ArrowLeft className="w-4 h-4 text-[#8a8886]" />
@@ -957,7 +1595,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleAddSectionAt(sectionIdx + 1)}
+                                  onClick={() => handleAddSectionAt(colIdx + 1)}
                                   className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-[#252628] text-left text-white cursor-pointer"
                                 >
                                   <ArrowRight className="w-4 h-4 text-[#8a8886]" />
@@ -970,7 +1608,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                           {/* Divider */}
                           <div className="border-t border-[#313235] my-1" />
 
-                          {/* 4. Expand or collapse columns > (Matching Asana Screenshot 4) */}
+                          {/* 4. Expand or collapse columns > */}
                           <div
                             className="relative"
                             onMouseEnter={() => {
@@ -985,7 +1623,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                               }`}
                             >
                               <div className="flex items-center gap-2.5">
-                                {/* Columns split icon */}
                                 <svg
                                   className="w-4 h-4 text-[#8a8886] group-hover:text-white shrink-0"
                                   viewBox="0 0 16 16"
@@ -1004,7 +1641,6 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                               <ChevronRight className="w-3.5 h-3.5 text-[#8a8886] group-hover:text-white" />
                             </button>
 
-                            {/* Expand / collapse submenu */}
                             {activeSubmenu === 'expand_collapse' && (
                               <div
                                 className={`absolute top-0 w-[160px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl py-1.5 z-50 text-[13px] text-[#f5f4f3] animate-in fade-in duration-100 ${
@@ -1066,7 +1702,7 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                           {/* Divider */}
                           <div className="border-t border-[#313235] my-1" />
 
-                          {/* 6. Delete section (Matching Asana Screenshot 5) */}
+                          {/* 6. Delete section */}
                           <div
                             className="relative"
                             onMouseEnter={() => {
@@ -1076,13 +1712,11 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                             onMouseLeave={() => setIsDeleteHovered(false)}
                           >
                             {isRecentlyAssigned ? (
-                              /* Disabled Delete option for Recently assigned */
                               <div className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#555659] cursor-not-allowed select-none">
                                 <Trash2 className="w-4 h-4 text-[#555659]" />
                                 <span>Delete section</span>
                               </div>
                             ) : (
-                              /* Enabled Delete option */
                               <button
                                 type="button"
                                 onClick={() => handleDeleteSection(section)}
@@ -1093,10 +1727,8 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                               </button>
                             )}
 
-                            {/* Tooltip when Delete is disabled (Matching Asana Screenshot 5) */}
                             {isRecentlyAssigned && isDeleteHovered && (
                               <div className="absolute top-[calc(100%+6px)] right-0 w-[230px] bg-[#2a2b2e] border border-[#3e4044] text-[#cfcecd] text-[12px] px-3 py-2 rounded-xl shadow-2xl pointer-events-none z-[100] animate-in fade-in duration-100">
-                                {/* Arrow pointing up */}
                                 <div className="absolute -top-[6px] right-6 w-0 h-0 border-x-[6px] border-x-transparent border-b-[6px] border-b-[#2a2b2e]" />
                                 <span className="leading-snug block">
                                   This section can&apos;t be deleted because new tasks assigned to you appear here
@@ -1188,15 +1820,17 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
                         </div>
 
                         {/* 2. Second Row: Project Badge [■] Kevin's first project */}
-                        <div className="mt-2.5">
-                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#2a2b2e] text-[#cfcecd] text-[11px] font-normal hover:bg-[#343539] transition-colors">
-                            <span className="w-2.5 h-2.5 rounded-xs bg-white/70" />
-                            <span>Kevin&apos;s first project</span>
-                          </span>
-                        </div>
+                        {boardVisibleFields.project && (
+                          <div className="mt-2.5">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#2a2b2e] text-[#cfcecd] text-[11px] font-normal hover:bg-[#343539] transition-colors">
+                              <span className="w-2.5 h-2.5 rounded-xs bg-white/70" />
+                              <span>{task.projectName || "Kevin's first project"}</span>
+                            </span>
+                          </div>
+                        )}
 
                         {/* 3. Third Row: Due date */}
-                        {task.dueDate && (
+                        {boardVisibleFields.dueDate && task.dueDate && (
                           <div className="mt-2">
                             <span
                               className={`text-[11px] font-medium ${getDueDateStyle(
@@ -1310,6 +1944,25 @@ export default function TaskBoard({ sections: initialSections, tasks, projectId 
           )}
         </div>
       </div>
+
+      {/* Options Drawer for Board View */}
+      <ListOptionsDrawer
+        isOpen={isListOptionsDrawerOpen}
+        onClose={() => setIsListOptionsDrawerOpen(false)}
+        columns={boardVisibleFields}
+        onToggleColumn={(colKey) => {
+          setBoardVisibleFields((prev) => ({
+            ...prev,
+            [colKey]: !prev[colKey],
+          }));
+        }}
+        filterMode={filterMode}
+        onFilterModeChange={(mode) => setFilterMode(mode)}
+        sortField={sortField}
+        onSortFieldChange={(sf) => setSortField(sf)}
+        groupField={groupField}
+        onGroupFieldChange={(gf) => setGroupField(gf)}
+      />
     </div>
   );
 }
