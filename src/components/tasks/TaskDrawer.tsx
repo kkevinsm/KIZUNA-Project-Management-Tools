@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { PriorityLevel, StatusLevel } from '@/lib/types';
+import DateRangePicker from './DateRangePicker';
 
 export default function TaskDrawer() {
   const {
@@ -212,15 +213,17 @@ export default function TaskDrawer() {
 
           {/* Due date */}
           <div className="text-[#8a8886]">Due date</div>
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-[#8a8886]" />
-            <input
-              type="text"
+          <div className="flex items-center">
+            <DateRangePicker
               value={activeTask.dueDate || ''}
-              onChange={(e) => updateTask(activeTask.id, { dueDate: e.target.value })}
-              placeholder="e.g. Today – Nov 4"
-              className="bg-transparent hover:bg-[#28292c] text-[#f5f4f3] rounded px-2 py-0.5 outline-none border border-transparent focus:border-[#4573d2]"
+              onChange={(newVal) => updateTask(activeTask.id, { dueDate: newVal })}
             />
+          </div>
+
+          {/* Dependencies matching Asana screenshot */}
+          <div className="text-[#8a8886]">Dependencies</div>
+          <div className="text-[13px] text-[#8a8886] hover:text-white cursor-pointer px-2 py-0.5">
+            None
           </div>
 
           {/* Projects & Section */}

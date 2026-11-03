@@ -19,8 +19,73 @@ interface TaskCalendarProps {
   tasks: Task[];
 }
 
+// Function to calculate start and end day column in the current week
+function getTaskWeekSpan(
+  task: Task,
+  weekDays: { dayNumber: number }[],
+  defaultIndex: number
+) {
+  const text = (task.dueDate || '').toLowerCase().trim();
+
+  let startNum = 2;
+  let endNum = 4;
+
+  if (text.includes('today')) {
+    startNum = 2;
+    endNum = text.includes('nov 4') ? 4 : 2;
+  }
+
+  const nums = text.match(/\d+/g);
+  if (nums && nums.length >= 2) {
+    startNum = parseInt(nums[0], 10);
+    endNum = parseInt(nums[nums.length - 1], 10);
+  } else if (nums && nums.length === 1) {
+    startNum = parseInt(nums[0], 10);
+    endNum = parseInt(nums[0], 10);
+  } else if (!text) {
+    // If no due date, fallback for Task 1 and Task 2
+    if (defaultIndex === 0) {
+      startNum = 2;
+      endNum = 4;
+    } else if (defaultIndex === 1) {
+      startNum = 3;
+      endNum = 5;
+    } else {
+      return null;
+    }
+  }
+
+  if (startNum > endNum) {
+    const tmp = startNum;
+    startNum = endNum;
+    endNum = tmp;
+  }
+
+  const startIdx = weekDays.findIndex((d) => d.dayNumber === startNum);
+  const endIdx = weekDays.findIndex((d) => d.dayNumber === endNum);
+
+  if (startIdx === -1 && endIdx === -1) {
+    return null;
+  }
+
+  const actualStart = startIdx !== -1 ? startIdx : 0;
+  const actualEnd = endIdx !== -1 ? endIdx : weekDays.length - 1;
+
+  return {
+    colStart: actualStart + 1, // 1-indexed for CSS grid
+    colEnd: actualEnd + 2,     // CSS grid column end is exclusive (+1 +1)
+    isMultiDay: actualEnd > actualStart,
+  };
+}
+
 export default function TaskCalendar({ tasks }: TaskCalendarProps) {
-  const { openTaskDrawer, toggleTaskComplete, openCreateModal, createTask } = useApp();
+  const {
+    openTaskDrawer,
+    activeTaskId,
+    toggleTaskComplete,
+    openCreateModal,
+    createTask,
+  } = useApp();
 
   const [viewMode, setViewMode] = useState<'weeks' | 'month'>('weeks');
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
@@ -29,10 +94,10 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [showWeekends, setShowWeekends] = useState(true);
 
-  // Week offset from November 1-7, 2026 (base week 0)
+  // Week offset from base week (November 1-7, 2026)
   const [weekOffset, setWeekOffset] = useState(0);
 
-  // Default week: Sunday Nov 1 – Saturday Nov 7, 2026
+  // Base week: Sunday Nov 1 – Saturday Nov 7, 2026
   const baseWeekDays = [
     { name: 'Sun', dayNumber: 1, fullDate: '2026-11-01' },
     { name: 'Mon', dayNumber: 2, fullDate: '2026-11-02' },
@@ -73,14 +138,53 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
     return true;
   });
 
-  // Multi-day spanning tasks matching Asana screenshot exactly:
-  // Task 1: spans Mon 2 to Wed 4 (col 2 to col 4, 3 days)
-  // Task 2: spans Tue 3 to Thu 5 (col 3 to col 5, 3 days)
-  const task1 = filteredTasks.find((t) => t.name.toLowerCase().includes('task 1')) || filteredTasks[0];
-  const task2 = filteredTasks.find((t) => t.name.toLowerCase().includes('task 2')) || filteredTasks[1];
+  // Calculate dynamic multi-day spanning tasks
+  const palettes = [
+    {
+      bg: 'bg-[#80eed2] hover:bg-[#8ef3da]',
+      text: 'text-[#0a382b]',
+      checkBorder: 'border-[#0a382b]/50 hover:border-[#0a382b]',
+      checkBg: 'bg-[#0a382b]',
+      checkText: 'text-[#80eed2]',
+      handleBorder: 'border-[#0a382b]/50',
+    },
+    {
+      bg: 'bg-[#f8be4e] hover:bg-[#fac561]',
+      text: 'text-[#3d2402]',
+      checkBorder: 'border-[#3d2402]/50 hover:border-[#3d2402]',
+      checkBg: 'bg-[#3d2402]',
+      checkText: 'text-[#f8be4e]',
+      handleBorder: 'border-[#3d2402]/50',
+    },
+    {
+      bg: 'bg-[#85c5f8] hover:bg-[#99d0fa]',
+      text: 'text-[#0d2f4d]',
+      checkBorder: 'border-[#0d2f4d]/50 hover:border-[#0d2f4d]',
+      checkBg: 'bg-[#0d2f4d]',
+      checkText: 'text-[#85c5f8]',
+      handleBorder: 'border-[#0d2f4d]/50',
+    },
+    {
+      bg: 'bg-[#bca3f5] hover:bg-[#c9b4f7]',
+      text: 'text-[#2e1859]',
+      checkBorder: 'border-[#2e1859]/50 hover:border-[#2e1859]',
+      checkBg: 'bg-[#2e1859]',
+      checkText: 'text-[#bca3f5]',
+      handleBorder: 'border-[#2e1859]/50',
+    },
+  ];
 
-  // Additional tasks that fall on specific days
-  const otherTasks = filteredTasks.filter((t) => t.id !== task1?.id && t.id !== task2?.id);
+  // Map spanning tasks
+  const spanningTasks = filteredTasks
+    .map((task, idx) => {
+      const span = getTaskWeekSpan(task, weekDays, idx);
+      const palette = palettes[idx % palettes.length];
+      return { task, span, palette };
+    })
+    .filter((item): item is { task: Task; span: { colStart: number; colEnd: number; isMultiDay: boolean }; palette: typeof palettes[0] } => item.span !== null && item.span.isMultiDay);
+
+  const spanningTaskIds = new Set(spanningTasks.map((s) => s.task.id));
+  const otherTasks = filteredTasks.filter((t) => !spanningTaskIds.has(t.id));
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1e1f21] select-none text-[#f5f4f3] overflow-hidden">
@@ -321,83 +425,52 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
               gridTemplateColumns: `repeat(${weekDays.length}, minmax(0, 1fr))`,
             }}
           >
-            {/* Task 1: Spans Mon 2 to Wed 4 (Mint / Turquoise #80eed2) */}
-            {task1 && weekOffset === 0 && (
-              <div
-                style={{
-                  gridColumnStart: showWeekends ? 2 : 1, // Mon is col 2 with weekends, col 1 without
-                  gridColumnEnd: showWeekends ? 5 : 4,   // Spans through Wed 4
-                }}
-                onClick={() => openTaskDrawer(task1.id)}
-                className="h-[30px] rounded-lg bg-[#80eed2] hover:bg-[#8ef3da] text-[#0a382b] flex items-center justify-between px-2.5 shadow-sm cursor-pointer transition-all mx-1 group"
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTaskComplete(task1.id);
-                    }}
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
-                      task1.completed
-                        ? 'bg-[#0a382b] border-[#0a382b] text-[#80eed2]'
-                        : 'border-[#0a382b]/50 hover:border-[#0a382b]'
-                    }`}
-                  >
-                    {task1.completed && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                  </button>
+            {spanningTasks.map(({ task, span, palette }) => {
+              const isActive = activeTaskId === task.id;
+
+              return (
+                <div
+                  key={task.id}
+                  style={{
+                    gridColumnStart: span.colStart,
+                    gridColumnEnd: span.colEnd,
+                  }}
+                  onClick={() => openTaskDrawer(task.id)}
+                  className={`h-[30px] rounded-lg ${palette.bg} ${palette.text} flex items-center justify-between px-2.5 shadow-sm cursor-pointer transition-all mx-1 group ${
+                    isActive ? 'ring-2 ring-white/90 ring-offset-2 ring-offset-[#1e1f21]' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleTaskComplete(task.id);
+                      }}
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                        task.completed
+                          ? `${palette.checkBg} border-transparent ${palette.checkText}`
+                          : palette.checkBorder
+                      }`}
+                    >
+                      {task.completed && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                    </button>
+                    <span
+                      className={`truncate font-semibold text-[13px] ${
+                        task.completed ? 'line-through opacity-70' : ''
+                      }`}
+                    >
+                      {task.name}
+                    </span>
+                  </div>
+
+                  {/* Right square resize handle */}
                   <span
-                    className={`truncate font-semibold text-[13px] ${
-                      task1.completed ? 'line-through opacity-70' : ''
-                    }`}
-                  >
-                    {task1.name}
-                  </span>
+                    className={`w-3 h-3 rounded-xs border ${palette.handleBorder} opacity-60 group-hover:opacity-100 flex-shrink-0`}
+                  ></span>
                 </div>
-
-                {/* Right square resize handle */}
-                <span className="w-3 h-3 rounded-xs border border-[#0a382b]/50 opacity-60 group-hover:opacity-100 flex-shrink-0"></span>
-              </div>
-            )}
-
-            {/* Task 2: Spans Tue 3 to Thu 5 (Amber / Gold #f8be4e) */}
-            {task2 && weekOffset === 0 && (
-              <div
-                style={{
-                  gridColumnStart: showWeekends ? 3 : 2, // Tue is col 3 with weekends, col 2 without
-                  gridColumnEnd: showWeekends ? 6 : 5,   // Spans through Thu 5
-                }}
-                onClick={() => openTaskDrawer(task2.id)}
-                className="h-[30px] rounded-lg bg-[#f8be4e] hover:bg-[#fac561] text-[#3d2402] flex items-center justify-between px-2.5 shadow-sm cursor-pointer transition-all mx-1 group"
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTaskComplete(task2.id);
-                    }}
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
-                      task2.completed
-                        ? 'bg-[#3d2402] border-[#3d2402] text-[#f8be4e]'
-                        : 'border-[#3d2402]/50 hover:border-[#3d2402]'
-                    }`}
-                  >
-                    {task2.completed && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                  </button>
-                  <span
-                    className={`truncate font-semibold text-[13px] ${
-                      task2.completed ? 'line-through opacity-70' : ''
-                    }`}
-                  >
-                    {task2.name}
-                  </span>
-                </div>
-
-                {/* Right square resize handle */}
-                <span className="w-3 h-3 rounded-xs border border-[#3d2402]/50 opacity-60 group-hover:opacity-100 flex-shrink-0"></span>
-              </div>
-            )}
+              );
+            })}
           </div>
 
           {/* Vertical Day Columns Grid with subtle '+ Add task' centered in each */}
@@ -410,10 +483,14 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
             {weekDays.map((day) => {
               const isToday = weekOffset === 0 && day.dayNumber === 3;
 
-              // Any other tasks specifically due on this day
-              const dayTasks = otherTasks.filter((t) =>
-                t.dueDate.toLowerCase().includes(`nov ${day.dayNumber}`)
-              );
+              // Any tasks specifically due on this day
+              const dayTasks = otherTasks.filter((t) => {
+                const text = (t.dueDate || '').toLowerCase();
+                return (
+                  text.includes(`nov ${day.dayNumber}`) ||
+                  (day.dayNumber === 2 && text.includes('today'))
+                );
+              });
 
               return (
                 <div
@@ -428,7 +505,11 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
                       <div
                         key={t.id}
                         onClick={() => openTaskDrawer(t.id)}
-                        className="bg-[#2a2b2f] hover:bg-[#333539] border border-[#3a3b3e] text-white p-2 rounded-lg text-[12px] truncate cursor-pointer transition-colors shadow-sm flex items-center gap-2"
+                        className={`bg-[#2a2b2f] hover:bg-[#333539] border text-white p-2 rounded-lg text-[12px] truncate cursor-pointer transition-colors shadow-sm flex items-center gap-2 ${
+                          activeTaskId === t.id
+                            ? 'border-white ring-1 ring-white/50'
+                            : 'border-[#3a3b3e]'
+                        }`}
                       >
                         <button
                           type="button"
@@ -444,7 +525,11 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
                         >
                           {t.completed && <Check className="w-2 h-2 stroke-[3]" />}
                         </button>
-                        <span className={`truncate font-medium ${t.completed ? 'line-through text-[#8a8886]' : ''}`}>
+                        <span
+                          className={`truncate font-medium ${
+                            t.completed ? 'line-through text-[#8a8886]' : ''
+                          }`}
+                        >
                           {t.name}
                         </span>
                       </div>
@@ -484,9 +569,10 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
 
               const matching = filteredTasks.filter((t) => {
                 if (!isNov) return false;
-                if (displayDay === 2 && t.dueDate.includes('Nov 2')) return true;
-                if (displayDay === 3 && (t.dueDate.includes('Today') || t.dueDate.includes('Nov 3'))) return true;
-                if (displayDay === 4 && t.dueDate.includes('Nov 4')) return true;
+                const text = (t.dueDate || '').toLowerCase();
+                if (displayDay === 2 && (text.includes('today') || text.includes('nov 2'))) return true;
+                if (displayDay === 3 && text.includes('nov 3')) return true;
+                if (displayDay === 4 && text.includes('nov 4')) return true;
                 return false;
               });
 
