@@ -29,13 +29,15 @@ export interface ChartFilter {
 export interface ChartConfig {
   id: string;
   title: string;
-  type: 'number' | 'bar' | 'stacked_bar' | 'grouped_bar' | 'line' | 'burnup' | 'burndown' | 'donut' | 'lollipop';
+  type: 'number' | 'bar' | 'stacked_bar' | 'grouped_bar' | 'line' | 'burnup' | 'burndown' | 'donut' | 'lollipop' | 'text';
   color: string;
   filterCountText: string;
   filters: ChartFilter[];
   valueType: string;
   aggregation: string;
   size: 'kpi' | 'large';
+  colSpan?: 1 | 2;
+  textContent?: string;
   xAxis?: string;
   groupBy?: string;
   showAsPercentage?: boolean;

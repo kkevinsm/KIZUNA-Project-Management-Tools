@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus,
   SlidersHorizontal,
@@ -8,7 +8,7 @@ import {
   Maximize2,
   Edit2,
   MoreHorizontal,
-  Filter,
+  ChevronRight,
 } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { useApp } from '@/context/AppContext';
@@ -133,32 +133,55 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
     return DEFAULT_WIDGETS;
   });
 
+  const [isAddWidgetMenuOpen, setIsAddWidgetMenuOpen] = useState(false);
+  const [activeMenuWidgetId, setActiveMenuWidgetId] = useState<string | null>(null);
+
   const [editingWidget, setEditingWidget] = useState<ChartConfig | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isNewWidget, setIsNewWidget] = useState(false);
   const [hoveredWidgetId, setHoveredWidgetId] = useState<string | null>(null);
 
+  const addWidgetMenuRef = useRef<HTMLDivElement>(null);
+  const widgetMenuRef = useRef<HTMLDivElement>(null);
+
   const sections = ['Recently assigned', 'Do today', 'Do next week', 'Do later'];
 
-  // Save to localStorage when widgets update
-  const handleSaveWidget = (updated: ChartConfig) => {
-    setWidgets((prev) => {
-      const exists = prev.some((w) => w.id === updated.id);
-      const next = exists ? prev.map((w) => (w.id === updated.id ? updated : w)) : [...prev, updated];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kizuna_dashboard_widgets', JSON.stringify(next));
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addWidgetMenuRef.current && !addWidgetMenuRef.current.contains(e.target as Node)) {
+        setIsAddWidgetMenuOpen(false);
       }
-      return next;
-    });
+      if (widgetMenuRef.current && !widgetMenuRef.current.contains(e.target as Node)) {
+        setActiveMenuWidgetId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Save to localStorage when widgets update
+  const persistWidgets = (newWidgets: ChartConfig[]) => {
+    setWidgets(newWidgets);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('kizuna_dashboard_widgets', JSON.stringify(newWidgets));
+    }
+  };
+
+  const handleSaveWidget = (updated: ChartConfig) => {
+    const exists = widgets.some((w) => w.id === updated.id);
+    const next = exists ? widgets.map((w) => (w.id === updated.id ? updated : w)) : [...widgets, updated];
+    persistWidgets(next);
   };
 
   const handleOpenEdit = (widget: ChartConfig) => {
     setEditingWidget(widget);
     setIsNewWidget(false);
     setIsEditModalOpen(true);
+    setActiveMenuWidgetId(null);
   };
 
-  const handleAddNewWidget = () => {
+  const handleAddNewChart = () => {
     const newWidget: ChartConfig = {
       id: `w-custom-${Date.now()}`,
       title: 'New chart',
@@ -175,6 +198,87 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
     setEditingWidget(newWidget);
     setIsNewWidget(true);
     setIsEditModalOpen(true);
+    setIsAddWidgetMenuOpen(false);
+  };
+
+  const handleAddTextWidget = () => {
+    const newTextWidget: ChartConfig = {
+      id: `w-text-${Date.now()}`,
+      title: 'Text',
+      type: 'text',
+      color: '#a8a5f8',
+      size: 'large',
+      colSpan: 1,
+      filterCountText: '',
+      filters: [],
+      valueType: 'Text',
+      aggregation: '',
+      textContent: '',
+    };
+    persistWidgets([...widgets, newTextWidget]);
+    setIsAddWidgetMenuOpen(false);
+  };
+
+  const handleUpdateTextContent = (id: string, text: string) => {
+    setWidgets((prev) => {
+      const next = prev.map((w) => (w.id === id ? { ...w, textContent: text } : w));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('kizuna_dashboard_widgets', JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
+  const handleResizeWidget = (id: string) => {
+    const next = widgets.map((w) => {
+      if (w.id === id) {
+        const nextColSpan = w.colSpan === 2 ? 1 : 2;
+        return { ...w, colSpan: nextColSpan as 1 | 2 };
+      }
+      return w;
+    });
+    persistWidgets(next);
+    setActiveMenuWidgetId(null);
+  };
+
+  const handleDuplicateWidget = (id: string) => {
+    const targetIdx = widgets.findIndex((w) => w.id === id);
+    if (targetIdx === -1) return;
+    const target = widgets[targetIdx];
+    const clone: ChartConfig = {
+      ...target,
+      id: `w-${target.type}-${Date.now()}`,
+      title: target.type === 'text' ? 'Text' : `${target.title} (Copy)`,
+    };
+    const next = [...widgets];
+    next.splice(targetIdx + 1, 0, clone);
+    persistWidgets(next);
+    setActiveMenuWidgetId(null);
+  };
+
+  const handleRemoveWidget = (id: string) => {
+    const next = widgets.filter((w) => w.id !== id);
+    persistWidgets(next);
+    setActiveMenuWidgetId(null);
+  };
+
+  const handleMoveWidget = (id: string, direction: 'up' | 'down') => {
+    const idx = widgets.findIndex((w) => w.id === id);
+    if (idx === -1) return;
+    if (direction === 'up' && idx > 0) {
+      const next = [...widgets];
+      const temp = next[idx - 1];
+      next[idx - 1] = next[idx];
+      next[idx] = temp;
+      persistWidgets(next);
+    } else if (direction === 'down' && idx < widgets.length - 1) {
+      const next = [...widgets];
+      const temp = next[idx + 1];
+      next[idx + 1] = next[idx];
+      next[idx] = temp;
+      persistWidgets(next);
+    }
+    setActiveMenuWidgetId(null);
   };
 
   // Compute metric for KPI
@@ -214,14 +318,66 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
     <div className="flex-1 bg-[#1e1f21] overflow-y-auto px-8 py-5 select-none text-white">
       {/* Top Toolbar: + Add widget & Send feedback */}
       <div className="flex items-center justify-between mb-5">
-        <button
-          type="button"
-          onClick={handleAddNewWidget}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#37383b] bg-[#252628] hover:bg-[#2d2e32] text-white text-[12.5px] font-medium transition-colors cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Add widget</span>
-        </button>
+        <div className="relative" ref={addWidgetMenuRef}>
+          <button
+            type="button"
+            onClick={() => setIsAddWidgetMenuOpen(!isAddWidgetMenuOpen)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#37383b] bg-[#252628] hover:bg-[#2d2e32] text-white text-[12.5px] font-medium transition-colors cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add widget</span>
+          </button>
+
+          {/* Dropdown Menu matching media_1793693283349_e58acd5f.png */}
+          {isAddWidgetMenuOpen && (
+            <div className="absolute left-0 mt-1.5 w-44 bg-[#1e1f21] border border-[#323438] rounded-lg shadow-2xl py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+              <button
+                type="button"
+                onClick={handleAddNewChart}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#e8e8e9] hover:bg-[#28292b] text-left transition-colors cursor-pointer group"
+              >
+                {/* 3 bars with plus icon */}
+                <svg
+                  className="w-4 h-4 text-[#8a8886] group-hover:text-white shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M4 20V14" />
+                  <path d="M9 20V9" />
+                  <path d="M14 20V5" />
+                  <path d="M20 7v6" />
+                  <path d="M17 10h6" />
+                </svg>
+                <span className="font-medium">Chart</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleAddTextWidget}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#e8e8e9] hover:bg-[#28292b] text-left transition-colors cursor-pointer group"
+              >
+                {/* A letter icon */}
+                <svg
+                  className="w-4 h-4 text-[#8a8886] group-hover:text-white shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="4 20 12 4 20 20" />
+                  <line x1="6.5" y1="15" x2="17.5" y2="15" />
+                </svg>
+                <span className="font-medium">Text</span>
+              </button>
+            </div>
+          )}
+        </div>
 
         <button
           type="button"
@@ -287,17 +443,132 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
           })}
         </div>
 
-        {/* Row 2 & 3: Large Chart Cards (2 columns per row) */}
+        {/* Row 2+: Large Chart Cards & Text Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {largeWidgets.map((w) => {
             const isHovered = hoveredWidgetId === w.id;
+            const isText = w.type === 'text';
+            const isMenuOpen = activeMenuWidgetId === w.id;
 
+            // Render Text Card matching media_1793693301430_4837ecc5.png
+            if (isText) {
+              return (
+                <div
+                  key={w.id}
+                  onMouseEnter={() => setHoveredWidgetId(w.id)}
+                  onMouseLeave={() => setHoveredWidgetId(null)}
+                  className={`bg-[#252628] border border-[#323438] hover:border-[#45474c] rounded-xl p-5 flex flex-col justify-between transition-all relative group shadow-sm min-h-[290px] ${
+                    w.colSpan === 2 ? 'col-span-1 lg:col-span-2' : 'col-span-1'
+                  }`}
+                >
+                  <div className="flex items-start justify-between flex-1">
+                    {/* Top Left: 6 dots drag icon & placeholder/content */}
+                    <div className="flex items-start gap-2.5 flex-1 mr-2">
+                      <GripVertical className="w-4 h-4 text-[#6d6e72] mt-0.5 cursor-grab active:cursor-grabbing shrink-0" />
+                      <textarea
+                        value={w.textContent || ''}
+                        onChange={(e) => handleUpdateTextContent(w.id, e.target.value)}
+                        placeholder="Add text, images, links and more to this dashboard."
+                        className="w-full h-full min-h-[220px] bg-transparent text-[#e8e8e9] placeholder-[#8a8b90] text-[13.5px] leading-relaxed resize-none focus:outline-none focus:ring-0 border-0 p-0"
+                      />
+                    </div>
+
+                    {/* Top Right: ••• More menu matching screenshot */}
+                    <div className="relative shrink-0" ref={isMenuOpen ? widgetMenuRef : undefined}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuWidgetId(isMenuOpen ? null : w.id);
+                        }}
+                        className={`w-7 h-7 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                          isMenuOpen ? 'bg-[#343538] text-white' : 'text-[#8a8886] hover:text-white hover:bg-[#343538]'
+                        }`}
+                        title="More options"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+
+                      {isMenuOpen && (
+                        <div className="absolute right-0 top-full mt-1.5 w-44 bg-[#1e1f21] border border-[#323438] rounded-lg shadow-2xl py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+                          {/* Move */}
+                          <div className="relative group/move">
+                            <button
+                              type="button"
+                              className="w-full flex items-center justify-between px-3.5 py-2 text-[13px] text-[#e8e8e9] hover:bg-[#28292b] text-left transition-colors cursor-pointer"
+                            >
+                              <span>Move</span>
+                              <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                            </button>
+                            <div className="hidden group-hover/move:block absolute right-full top-0 mr-1 w-32 bg-[#1e1f21] border border-[#323438] rounded-lg shadow-2xl py-1 z-40">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveWidget(w.id, 'up');
+                                }}
+                                className="w-full px-3 py-1.5 text-[12.5px] text-[#e8e8e9] hover:bg-[#28292b] text-left cursor-pointer"
+                              >
+                                Move up
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveWidget(w.id, 'down');
+                                }}
+                                className="w-full px-3 py-1.5 text-[12.5px] text-[#e8e8e9] hover:bg-[#28292b] text-left cursor-pointer"
+                              >
+                                Move down
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Resize */}
+                          <button
+                            type="button"
+                            onClick={() => handleResizeWidget(w.id)}
+                            className="w-full px-3.5 py-2 text-[13px] text-[#e8e8e9] hover:bg-[#28292b] text-left transition-colors cursor-pointer"
+                          >
+                            Resize
+                          </button>
+
+                          <div className="h-px bg-[#323438] my-1" />
+
+                          {/* Duplicate chart */}
+                          <button
+                            type="button"
+                            onClick={() => handleDuplicateWidget(w.id)}
+                            className="w-full px-3.5 py-2 text-[13px] text-[#e8e8e9] hover:bg-[#28292b] text-left transition-colors cursor-pointer"
+                          >
+                            Duplicate chart
+                          </button>
+
+                          {/* Remove chart */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveWidget(w.id)}
+                            className="w-full px-3.5 py-2 text-[13px] text-[#f06a6a] hover:bg-[#342426] text-left transition-colors font-medium cursor-pointer"
+                          >
+                            Remove chart
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // Standard Chart Widget
             return (
               <div
                 key={w.id}
                 onMouseEnter={() => setHoveredWidgetId(w.id)}
                 onMouseLeave={() => setHoveredWidgetId(null)}
-                className="bg-[#252628] border border-[#323438] hover:border-[#45474c] rounded-xl p-5 flex flex-col justify-between transition-all relative group shadow-sm min-h-[290px]"
+                className={`bg-[#252628] border border-[#323438] hover:border-[#45474c] rounded-xl p-5 flex flex-col justify-between transition-all relative group shadow-sm min-h-[290px] ${
+                  w.colSpan === 2 ? 'col-span-1 lg:col-span-2' : 'col-span-1'
+                }`}
               >
                 {/* Chart Header */}
                 <div className="flex items-center justify-between mb-2">
@@ -308,35 +579,114 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                     <h3 className="text-[13.5px] font-semibold text-white">{w.title}</h3>
                   </div>
 
-                  {/* Top-Right Hover Action Icons matching Screenshot 2 */}
-                  {isHovered && (
-                    <div className="flex items-center gap-1.5 text-[#8a8886] animate-in fade-in duration-100">
-                      <button
-                        type="button"
-                        onClick={() => alert('Expand widget')}
-                        className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
-                        title="Expand"
-                      >
-                        <Maximize2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEdit(w)}
-                        className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
-                        title="Edit chart"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => alert('More options: Duplicate, Delete, Download CSV')}
-                        className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
-                        title="More options"
-                      >
-                        <MoreHorizontal className="w-3.5 h-3.5" />
-                      </button>
+                  {/* Top-Right Action Icons */}
+                  <div className="flex items-center gap-1.5 text-[#8a8886]">
+                    {(isHovered || isMenuOpen) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleResizeWidget(w.id)}
+                          className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
+                          title="Resize / Expand"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(w)}
+                          className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
+                          title="Edit chart"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+
+                    <div className="relative" ref={isMenuOpen ? widgetMenuRef : undefined}>
+                      {(isHovered || isMenuOpen) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuWidgetId(isMenuOpen ? null : w.id);
+                          }}
+                          className={`p-1 rounded transition-colors cursor-pointer ${
+                            isMenuOpen ? 'bg-[#343538] text-white' : 'hover:text-white hover:bg-[#343538]'
+                          }`}
+                          title="More options"
+                        >
+                          <MoreHorizontal className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      {/* Dropdown Menu matching Screenshot */}
+                      {isMenuOpen && (
+                        <div className="absolute right-0 top-full mt-1.5 w-44 bg-[#1e1f21] border border-[#323438] rounded-lg shadow-2xl py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+                          {/* Move */}
+                          <div className="relative group/move">
+                            <button
+                              type="button"
+                              className="w-full flex items-center justify-between px-3.5 py-2 text-[13px] text-[#e8e8e9] hover:bg-[#28292b] text-left transition-colors cursor-pointer"
+                            >
+                              <span>Move</span>
+                              <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                            </button>
+                            <div className="hidden group-hover/move:block absolute right-full top-0 mr-1 w-32 bg-[#1e1f21] border border-[#323438] rounded-lg shadow-2xl py-1 z-40">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveWidget(w.id, 'up');
+                                }}
+                                className="w-full px-3 py-1.5 text-[12.5px] text-[#e8e8e9] hover:bg-[#28292b] text-left cursor-pointer"
+                              >
+                                Move up
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveWidget(w.id, 'down');
+                                }}
+                                className="w-full px-3 py-1.5 text-[12.5px] text-[#e8e8e9] hover:bg-[#28292b] text-left cursor-pointer"
+                              >
+                                Move down
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Resize */}
+                          <button
+                            type="button"
+                            onClick={() => handleResizeWidget(w.id)}
+                            className="w-full px-3.5 py-2 text-[13px] text-[#e8e8e9] hover:bg-[#28292b] text-left transition-colors cursor-pointer"
+                          >
+                            Resize
+                          </button>
+
+                          <div className="h-px bg-[#323438] my-1" />
+
+                          {/* Duplicate chart */}
+                          <button
+                            type="button"
+                            onClick={() => handleDuplicateWidget(w.id)}
+                            className="w-full px-3.5 py-2 text-[13px] text-[#e8e8e9] hover:bg-[#28292b] text-left transition-colors cursor-pointer"
+                          >
+                            Duplicate chart
+                          </button>
+
+                          {/* Remove chart */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveWidget(w.id)}
+                            className="w-full px-3.5 py-2 text-[13px] text-[#f06a6a] hover:bg-[#342426] text-left transition-colors font-medium cursor-pointer"
+                          >
+                            Remove chart
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Chart Body Renderings matching Screenshots 1, 2, 3 */}
@@ -687,7 +1037,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                   )}
 
                   {/* Fallback for other chart styles */}
-                  {!['bar', 'donut', 'lollipop', 'line'].includes(w.type) && (
+                  {!['bar', 'stacked_bar', 'grouped_bar', 'donut', 'lollipop', 'line'].includes(w.type) && (
                     <div className="text-[13px] text-[#8a8886] flex flex-col items-center gap-2">
                       <span>Custom {w.type} visualization</span>
                     </div>
