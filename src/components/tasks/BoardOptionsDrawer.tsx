@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowRightToLine,
   ArrowLeft,
@@ -25,6 +25,8 @@ import {
   Folder,
   LayoutGrid,
 } from 'lucide-react';
+import { useApp } from '@/context/AppContext';
+import EmojiPickerPopover from '@/components/common/EmojiPickerPopover';
 
 interface BoardOptionsDrawerProps {
   isOpen: boolean;
@@ -63,8 +65,18 @@ export default function BoardOptionsDrawer({
   showSubtasks = true,
   onToggleSubtasks,
 }: BoardOptionsDrawerProps) {
+  const { viewConfigs, updateViewConfig } = useApp();
+  const boardConfig = viewConfigs['Board'] || { name: 'Board', icon: '' };
+
   const [currentView, setCurrentView] = useState<'main' | 'layout' | 'fields' | 'filters' | 'sorts' | 'groups'>('main');
-  const [viewTitle, setViewTitle] = useState('Board');
+  const [viewTitle, setViewTitle] = useState(boardConfig.name || 'Board');
+  const [viewIcon, setViewIcon] = useState(boardConfig.icon || '');
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (boardConfig.name) setViewTitle(boardConfig.name);
+    if (boardConfig.icon !== undefined) setViewIcon(boardConfig.icon);
+  }, [boardConfig.name, boardConfig.icon]);
 
   if (!isOpen) return null;
 
@@ -78,7 +90,10 @@ export default function BoardOptionsDrawer({
       {/* Top Header */}
       <div className="h-[48px] px-4 border-b border-[#2b2c2e] flex items-center justify-between">
         {currentView === 'main' ? (
-          <h2 className="text-[16px] font-semibold text-white">Board</h2>
+          <h2 className="text-[16px] font-semibold text-white flex items-center gap-1.5">
+            {viewIcon && <span className="text-[18px]">{viewIcon}</span>}
+            <span>{viewTitle || 'Board'}</span>
+          </h2>
         ) : (
           <button
             onClick={() => setCurrentView('main')}
@@ -111,16 +126,41 @@ export default function BoardOptionsDrawer({
             {/* View Icon & Name */}
             <div>
               <div className="flex items-center gap-3">
-                <div>
+                <div className="relative">
                   <label className="text-[11px] text-[#8a8886] font-medium block mb-1">
                     Icon
                   </label>
                   <button
                     type="button"
-                    className="w-9 h-9 rounded-lg bg-[#252628] border border-[#37383b] flex items-center justify-center text-[#8a8886] hover:text-white cursor-pointer transition-colors"
+                    onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
+                    className="w-9 h-9 rounded-lg bg-[#252628] border border-[#37383b] hover:border-[#4573d2] flex items-center justify-center text-[#8a8886] hover:text-white cursor-pointer transition-colors"
+                    title="Change icon"
                   >
-                    <Smile className="w-4 h-4" />
+                    {viewIcon ? (
+                      <span className="text-[18px] leading-none">{viewIcon}</span>
+                    ) : (
+                      <Smile className="w-4 h-4" />
+                    )}
                   </button>
+
+                  {/* Emoji Picker Popover */}
+                  {isEmojiPickerOpen && (
+                    <div className="absolute top-16 left-0 z-50">
+                      <EmojiPickerPopover
+                        isOpen={isEmojiPickerOpen}
+                        onClose={() => setIsEmojiPickerOpen(false)}
+                        onSelectEmoji={(emoji) => {
+                          setViewIcon(emoji);
+                          updateViewConfig('Board', { icon: emoji });
+                        }}
+                        onClear={() => {
+                          setViewIcon('');
+                          updateViewConfig('Board', { icon: '' });
+                        }}
+                        currentEmoji={viewIcon}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1">
                   <label className="text-[11px] text-[#8a8886] font-medium block mb-1">
@@ -129,7 +169,10 @@ export default function BoardOptionsDrawer({
                   <input
                     type="text"
                     value={viewTitle}
-                    onChange={(e) => setViewTitle(e.target.value)}
+                    onChange={(e) => {
+                      setViewTitle(e.target.value);
+                      updateViewConfig('Board', { name: e.target.value });
+                    }}
                     className="w-full bg-[#1e1f21] border border-[#37383b] focus:border-[#4573d2] rounded-lg px-3 py-1.5 text-[13px] text-white outline-none transition-colors"
                   />
                 </div>
@@ -477,3 +520,4 @@ export default function BoardOptionsDrawer({
     </div>
   );
 }
+

@@ -64,6 +64,8 @@ interface AppContextType {
   toggleSubtask: (taskId: string, subtaskId: string) => void;
   addAttachment: (taskId: string, attachment: Attachment) => void;
   removeAttachment: (taskId: string, attachmentId: string) => void;
+  viewConfigs: Record<string, { name: string; icon?: string }>;
+  updateViewConfig: (viewKey: string, updates: Partial<{ name: string; icon?: string }>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -99,6 +101,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [viewConfigs, setViewConfigs] = useState<Record<string, { name: string; icon?: string }>>({
+    List: { name: 'List', icon: '' },
+    Board: { name: 'Board', icon: '' },
+    Calendar: { name: 'Calendar', icon: '' },
+    Dashboard: { name: 'Dashboard', icon: '' },
+    Files: { name: 'Files', icon: '' },
+    Overview: { name: 'Overview', icon: '' },
+    Timeline: { name: 'Timeline', icon: '' },
+  });
+
+  const updateViewConfig = useCallback((viewKey: string, updates: Partial<{ name: string; icon?: string }>) => {
+    setViewConfigs((prev) => {
+      const next = {
+        ...prev,
+        [viewKey]: {
+          ...(prev[viewKey] || { name: viewKey, icon: '' }),
+          ...updates,
+        },
+      };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('kizuna_view_configs', JSON.stringify(next));
+      }
+      return next;
+    });
+  }, []);
 
   // Sync snapshot to Cloudflare R2
   const syncToCloudflareR2 = useCallback(async (type: 'users' | 'tasks' | 'projects', data: unknown) => {
@@ -121,6 +148,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const savedAuth = localStorage.getItem('kizuna_is_auth');
       const savedTasks = localStorage.getItem('kizuna_tasks');
       const savedProjects = localStorage.getItem('kizuna_projects');
+      const savedViewConfigs = localStorage.getItem('kizuna_view_configs');
+
+      if (savedViewConfigs) {
+        try {
+          const parsed = JSON.parse(savedViewConfigs);
+          setViewConfigs((prev) => ({ ...prev, ...parsed }));
+        } catch {}
+      }
 
       let parsedUsers = INITIAL_USERS;
       if (savedUsers) {
@@ -625,6 +660,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         toggleSubtask,
         addAttachment,
         removeAttachment,
+        viewConfigs,
+        updateViewConfig,
       }}
     >
       {children}

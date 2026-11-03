@@ -35,6 +35,7 @@ export default function ProjectDetailPage() {
     currentUser,
     openCreateModal,
     createTask,
+    viewConfigs,
   } = useApp();
 
   const project = projects.find((p) => p.id === projectId) || projects[0];
@@ -143,28 +144,30 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* View Tabs */}
-        <div className="flex items-center gap-6 text-[13px] font-medium overflow-x-auto">
+        <div className="flex items-center gap-1.5 text-[13px] font-medium overflow-x-auto pb-1">
           {(['Overview', 'List', 'Board', 'Timeline', 'Dashboard', 'Calendar', 'Files'] as const).map(
-            (tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`pb-2.5 transition-colors relative whitespace-nowrap ${
-                  activeTab === tab
-                    ? 'text-white font-semibold'
-                    : 'text-[#8a8886] hover:text-[#bdbbb9]'
-                }`}
-              >
-                <span>{tab}</span>
-                {activeTab === tab && (
-                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#4573d2] rounded-full" />
-                )}
-              </button>
-            )
+            (tab) => {
+              const config = viewConfigs[tab] || { name: tab, icon: '' };
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? 'bg-[#0c326f] text-white font-medium shadow-xs'
+                      : 'text-[#a2a09e] hover:text-white hover:bg-[#252628]/40'
+                  }`}
+                >
+                  {config.icon && <span className="text-[14px] leading-none">{config.icon}</span>}
+                  <span>{config.name || tab}</span>
+                </button>
+              );
+            }
           )}
           <button
             onClick={() => alert("Add view tab")}
-            className="text-[#8a8886] hover:text-white pb-2.5 font-bold"
+            className="text-[#8a8886] hover:text-white px-2 py-1 font-bold rounded-lg hover:bg-[#252628]/40 transition-colors cursor-pointer text-[14px]"
           >
             +
           </button>

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
+  ArrowRightToLine,
   ArrowRight,
   ArrowLeft,
   ChevronRight,
@@ -18,6 +19,8 @@ import {
   Plus,
   X,
 } from 'lucide-react';
+import { useApp } from '@/context/AppContext';
+import EmojiPickerPopover from '@/components/common/EmojiPickerPopover';
 
 export interface CalendarFilterItem {
   id: string;
@@ -65,12 +68,22 @@ export default function CalendarOptionsDrawer({
 }: CalendarOptionsDrawerProps) {
   const [currentView, setCurrentView] = useState<'main' | 'layout' | 'filters' | 'add_filter'>(initialView);
 
+  const { viewConfigs, updateViewConfig } = useApp();
+  const calendarConfig = viewConfigs['Calendar'] || { name: 'Calendar', icon: '' };
+  const [viewName, setViewName] = useState(calendarConfig.name || 'Calendar');
+  const [viewIcon, setViewIcon] = useState(calendarConfig.icon || '');
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (calendarConfig.name) setViewName(calendarConfig.name);
+    if (calendarConfig.icon !== undefined) setViewIcon(calendarConfig.icon);
+  }, [calendarConfig.name, calendarConfig.icon]);
+
   React.useEffect(() => {
     if (isOpen) {
       setCurrentView(initialView || 'main');
     }
   }, [isOpen, initialView]);
-  const [viewName, setViewName] = useState('Calendar');
   const [isZoomDropdownOpen, setIsZoomDropdownOpen] = useState(false);
   const [filterSearch, setFilterSearch] = useState('');
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
@@ -99,7 +112,7 @@ export default function CalendarOptionsDrawer({
                   className="p-1.5 rounded-lg text-[#9c9a99] hover:text-white hover:bg-[#28292c] transition-colors"
                   title="Close"
                 >
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRightToLine className="w-4 h-4" />
                 </button>
               </div>
 
@@ -112,16 +125,46 @@ export default function CalendarOptionsDrawer({
                     <span>View name</span>
                   </div>
                   <div className="flex items-center gap-2.5">
-                    <button
-                      type="button"
-                      className="w-10 h-10 rounded-lg bg-[#242528] hover:bg-[#2d2e32] border border-[#37383b] flex items-center justify-center text-[#9c9a99] hover:text-white transition-colors shrink-0"
-                    >
-                      <Smile className="w-4 h-4" />
-                    </button>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
+                        className="w-10 h-10 rounded-lg bg-[#242528] hover:bg-[#2d2e32] border border-[#37383b] hover:border-[#4573d2] flex items-center justify-center text-[#9c9a99] hover:text-white transition-colors shrink-0 cursor-pointer"
+                        title="Change icon"
+                      >
+                        {viewIcon ? (
+                          <span className="text-[18px] leading-none">{viewIcon}</span>
+                        ) : (
+                          <Smile className="w-4 h-4" />
+                        )}
+                      </button>
+
+                      {/* Emoji Picker Popover */}
+                      {isEmojiPickerOpen && (
+                        <div className="absolute top-12 left-0 z-50">
+                          <EmojiPickerPopover
+                            isOpen={isEmojiPickerOpen}
+                            onClose={() => setIsEmojiPickerOpen(false)}
+                            onSelectEmoji={(emoji) => {
+                              setViewIcon(emoji);
+                              updateViewConfig('Calendar', { icon: emoji });
+                            }}
+                            onClear={() => {
+                              setViewIcon('');
+                              updateViewConfig('Calendar', { icon: '' });
+                            }}
+                            currentEmoji={viewIcon}
+                          />
+                        </div>
+                      )}
+                    </div>
                     <input
                       type="text"
                       value={viewName}
-                      onChange={(e) => setViewName(e.target.value)}
+                      onChange={(e) => {
+                        setViewName(e.target.value);
+                        updateViewConfig('Calendar', { name: e.target.value });
+                      }}
                       className="flex-1 h-10 bg-[#1e1f21] border border-[#37383b] focus:border-[#4573d2] rounded-lg px-3 text-white text-[13.5px] outline-none"
                     />
                   </div>

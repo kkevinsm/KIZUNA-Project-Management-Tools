@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  ArrowRight,
+  ArrowRightToLine,
   ArrowLeft,
   ChevronRight,
   ChevronDown,
@@ -29,6 +29,8 @@ import {
   Hourglass,
   Users,
 } from 'lucide-react';
+import { useApp } from '@/context/AppContext';
+import EmojiPickerPopover from '@/components/common/EmojiPickerPopover';
 
 interface ListOptionsDrawerProps {
   isOpen: boolean;
@@ -55,8 +57,18 @@ export default function ListOptionsDrawer({
   groupField,
   onGroupFieldChange,
 }: ListOptionsDrawerProps) {
+  const { viewConfigs, updateViewConfig } = useApp();
+  const listConfig = viewConfigs['List'] || { name: 'List', icon: '' };
+
   const [currentView, setCurrentView] = useState<'main' | 'columns' | 'filters' | 'sorts' | 'groups'>('main');
-  const [viewTitle, setViewTitle] = useState('List');
+  const [viewTitle, setViewTitle] = useState(listConfig.name || 'List');
+  const [viewIcon, setViewIcon] = useState(listConfig.icon || '');
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (listConfig.name) setViewTitle(listConfig.name);
+    if (listConfig.icon !== undefined) setViewIcon(listConfig.icon);
+  }, [listConfig.name, listConfig.icon]);
 
   if (!isOpen) return null;
 
@@ -70,7 +82,10 @@ export default function ListOptionsDrawer({
       {/* Top Header */}
       <div className="h-[48px] px-4 border-b border-[#2b2c2e] flex items-center justify-between">
         {currentView === 'main' ? (
-          <h2 className="text-[16px] font-bold text-white">List</h2>
+          <h2 className="text-[16px] font-bold text-white flex items-center gap-1.5">
+            {viewIcon && <span className="text-[18px]">{viewIcon}</span>}
+            <span>{viewTitle || 'List'}</span>
+          </h2>
         ) : (
           <button
             onClick={() => setCurrentView('main')}
@@ -91,7 +106,7 @@ export default function ListOptionsDrawer({
           className="p-1 rounded-md text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors"
           title="Close"
         >
-          <ArrowRight className="w-4 h-4" />
+          <ArrowRightToLine className="w-4 h-4" />
         </button>
       </div>
 
@@ -101,18 +116,54 @@ export default function ListOptionsDrawer({
           <>
             {/* View Icon & Name */}
             <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#252628] border border-[#37383b] flex items-center justify-center text-[#8a8886] hover:text-white cursor-pointer transition-colors">
-                  <Smile className="w-4 h-4" />
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <label className="text-[10px] text-[#8a8886] font-semibold uppercase tracking-wider block mb-1">
+                    Icon
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
+                    className="w-9 h-9 rounded-lg bg-[#252628] border border-[#37383b] hover:border-[#4573d2] flex items-center justify-center text-[#8a8886] hover:text-white cursor-pointer transition-colors"
+                    title="Change icon"
+                  >
+                    {viewIcon ? (
+                      <span className="text-[18px] leading-none">{viewIcon}</span>
+                    ) : (
+                      <Smile className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  {/* Emoji Picker Popover */}
+                  {isEmojiPickerOpen && (
+                    <div className="absolute top-16 left-0 z-50">
+                      <EmojiPickerPopover
+                        isOpen={isEmojiPickerOpen}
+                        onClose={() => setIsEmojiPickerOpen(false)}
+                        onSelectEmoji={(emoji) => {
+                          setViewIcon(emoji);
+                          updateViewConfig('List', { icon: emoji });
+                        }}
+                        onClear={() => {
+                          setViewIcon('');
+                          updateViewConfig('List', { icon: '' });
+                        }}
+                        currentEmoji={viewIcon}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1">
-                  <label className="text-[10px] text-[#8a8886] font-semibold uppercase tracking-wider block">
+                  <label className="text-[10px] text-[#8a8886] font-semibold uppercase tracking-wider block mb-1">
                     View name
                   </label>
                   <input
                     type="text"
                     value={viewTitle}
-                    onChange={(e) => setViewTitle(e.target.value)}
+                    onChange={(e) => {
+                      setViewTitle(e.target.value);
+                      updateViewConfig('List', { name: e.target.value });
+                    }}
                     className="w-full bg-[#252628] border border-[#37383b] focus:border-[#4573d2] rounded px-2.5 py-1 text-[13px] text-white outline-none"
                   />
                 </div>
