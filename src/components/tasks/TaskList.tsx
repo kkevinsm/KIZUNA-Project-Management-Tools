@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -31,11 +31,18 @@ import {
   ArrowUp,
   ArrowDown,
   SlidersHorizontal,
+  CheckSquare,
+  Target,
+  Hash,
+  Code,
+  Timer,
+  Library,
+  ChevronUp,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import TaskRow from '@/components/tasks/TaskRow';
 import ListOptionsDrawer from '@/components/tasks/ListOptionsDrawer';
-import { Task, PriorityLevel } from '@/lib/types';
+import { Task, PriorityLevel, CustomColumn } from '@/lib/types';
 
 interface TaskListProps {
   tasks: Task[];
@@ -50,7 +57,6 @@ export default function TaskList({
     createTask,
     updateTask,
     deleteTask,
-    openCreateModal,
   } = useApp();
 
   // Sections state
@@ -59,6 +65,32 @@ export default function TaskList({
   const [editingSectionName, setEditingSectionName] = useState<string | null>(null);
   const [editSectionValue, setEditSectionValue] = useState('');
   const [openSectionMenu, setOpenSectionMenu] = useState<string | null>(null);
+
+  // Custom columns state (persisted in localStorage)
+  const [customColumns, setCustomColumns] = useState<CustomColumn[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('kizuna_custom_columns');
+        if (saved) return JSON.parse(saved);
+      } catch {
+        // default empty
+      }
+    }
+    return [];
+  });
+
+  // Add custom column state
+  const [isAddColumnOpen, setIsAddColumnOpen] = useState(false);
+  const [newColumnName, setNewColumnName] = useState('');
+
+  // Save customColumns to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('kizuna_custom_columns', JSON.stringify(customColumns));
+      } catch {}
+    }
+  }, [customColumns]);
 
   // Inline add task per section
   const [inlineNewTaskSection, setInlineNewTaskSection] = useState<string | null>(null);
@@ -84,11 +116,11 @@ export default function TaskList({
   const [isListOptionsDrawerOpen, setIsListOptionsDrawerOpen] = useState(false);
 
   // Filter, Sort, Group State
-  const [filterMode, setFilterMode] = useState<string>('incomplete'); // 'incomplete' | 'completed' | 'all' | 'due_this_week' | 'due_next_week'
-  const [sortField, setSortField] = useState<string>('none'); // 'none' | 'start_date' | 'due_date' | 'created_by' | 'created_on' | 'last_modified' | 'completed_on' | 'likes' | 'alphabetical' | 'project'
+  const [filterMode, setFilterMode] = useState<string>('all'); // default to 'all' or 'incomplete'
+  const [sortField, setSortField] = useState<string>('none');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [groupField, setGroupField] = useState<string>('section'); // 'section' | 'start_date' | 'due_date' | 'created_by' | 'created_on' | 'last_modified' | 'completed_on' | 'project' | 'none'
-  const [groupOrder, setGroupOrder] = useState<string>('Custom order'); // 'Custom order' | 'Ascending' | 'Descending'
+  const [groupField, setGroupField] = useState<string>('section');
+  const [groupOrder, setGroupOrder] = useState<string>('Custom order');
 
   // Columns visibility state
   const [columns, setColumns] = useState<Record<string, boolean>>({
@@ -130,6 +162,7 @@ export default function TaskList({
         setIsGroupMoreMenuOpen(false);
         setIsAddFilterMenuOpen(false);
         setIsCompletedTasksSubmenuOpen(false);
+        setIsAddColumnOpen(false);
         setOpenSectionMenu(null);
       }
     };
@@ -185,6 +218,24 @@ export default function TaskList({
     setIsAddingSection(false);
   };
 
+  // Add custom column handler
+  const handleCreateCustomColumn = (type: CustomColumn['type'], defaultLabel?: string) => {
+    const colName = newColumnName.trim() || defaultLabel || 'New field';
+    const newCol: CustomColumn = {
+      id: `custom_${Date.now()}`,
+      name: colName,
+      type,
+    };
+    setCustomColumns((prev) => [...prev, newCol]);
+    setNewColumnName('');
+    setIsAddColumnOpen(false);
+  };
+
+  // Delete custom column handler
+  const handleDeleteCustomColumn = (colId: string) => {
+    setCustomColumns((prev) => prev.filter((c) => c.id !== colId));
+  };
+
   // Inline add task
   const handleInlineCreate = (section: string, taskType: 'task' | 'milestone' | 'approval' = 'task') => {
     if (!inlineTaskName.trim()) {
@@ -215,7 +266,6 @@ export default function TaskList({
   // Filter tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
-      // 1. Completion / status filter
       if (filterMode === 'incomplete' && t.completed) return false;
       if (filterMode === 'completed' && !t.completed) return false;
       if (filterMode === 'due_this_week') {
@@ -227,7 +277,6 @@ export default function TaskList({
         if (!due.includes('nov 10') && !due.includes('next week')) return false;
       }
 
-      // 2. Search keyword filter
       if (searchKeyword.trim()) {
         const q = searchKeyword.toLowerCase();
         const matchesName = t.name.toLowerCase().includes(q);
@@ -271,11 +320,14 @@ export default function TaskList({
 
     if (groupField === 'start_date' || groupField === 'due_date') {
       let groups = [
-        { groupName: 'Today', id: 'today', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('today')) },
-        { groupName: 'Tomorrow', id: 'tomorrow', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('nov 4') || (t.dueDate || '').toLowerCase().includes('tomorrow')) },
-        { groupName: 'Next week', id: 'next_week', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('nov 10') || (t.dueDate || '').toLowerCase().includes('next week')) },
-        { groupName: 'Later', id: 'later', tasks: sortedTasks.filter((t) => !(t.dueDate || '').toLowerCase().includes('today') && !(t.dueDate || '').toLowerCase().includes('nov 4') && !(t.dueDate || '').toLowerCase().includes('nov 10') && t.dueDate) },
-        { groupName: 'No Due Date', id: 'no_due', tasks: sortedTasks.filter((t) => !t.dueDate) },
+        { groupName: 'Before September 2026', id: 'before_sep', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('aug') || (t.dueDate || '').toLowerCase().includes('jul')) },
+        { groupName: 'September 2026', id: 'sep_2026', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('sep')) },
+        { groupName: 'October 2026', id: 'oct_2026', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('oct')) },
+        { groupName: 'Last 30 days', id: 'last_30_days', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('last 30')) },
+        { groupName: 'Last 7 days', id: 'last_7_days', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('last 7')) },
+        { groupName: 'Yesterday', id: 'yesterday', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('yesterday') || (t.dueDate || '').toLowerCase().includes('nov 2')) },
+        { groupName: 'Today', id: 'today', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('today') || (t.dueDate || '').toLowerCase().includes('nov 3')) },
+        { groupName: 'Upcoming', id: 'upcoming', tasks: sortedTasks.filter((t) => (t.dueDate || '').toLowerCase().includes('nov 4') || (t.dueDate || '').toLowerCase().includes('nov 10')) },
       ];
       if (!showEmptyGroups) {
         groups = groups.filter((g) => g.tasks.length > 0);
@@ -395,7 +447,6 @@ export default function TaskList({
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
 
-          {/* Split button dropdown */}
           {isAddMenuOpen && (
             <div className="absolute top-8 left-0 w-44 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-30 text-[13px]">
               <button
@@ -425,7 +476,7 @@ export default function TaskList({
 
         {/* Right action controls */}
         <div className="flex items-center gap-2 text-[#bdbbb9] text-[12px]">
-          {/* 1. FILTER BUTTON & ASANA FILTER POPOVER */}
+          {/* 1. FILTER BUTTON */}
           <div className="relative" data-popover>
             {isFilterActive ? (
               <div className="inline-flex items-center bg-[#0d3880] text-white border border-[#1d4ea8] rounded-lg text-[12px] font-medium overflow-hidden shadow-xs">
@@ -469,7 +520,6 @@ export default function TaskList({
               </button>
             )}
 
-            {/* Exact Asana Filter Popover */}
             {isFilterPopoverOpen && (
               <div className="absolute right-0 top-8 w-[420px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl p-4 z-40 text-[13px] animate-in fade-in duration-150">
                 <div className="flex items-center justify-between pb-3">
@@ -599,7 +649,7 @@ export default function TaskList({
             )}
           </div>
 
-          {/* 2. SORT BUTTON & ASANA SORT POPOVER */}
+          {/* 2. SORT BUTTON */}
           <div className="relative" data-popover>
             {isSortActive ? (
               <div className="inline-flex items-center bg-[#0d3880] text-white border border-[#1d4ea8] rounded-lg text-[12px] font-medium overflow-hidden shadow-xs">
@@ -703,7 +753,7 @@ export default function TaskList({
             )}
           </div>
 
-          {/* 3. GROUP BUTTON & ASANA GROUPS POPOVER */}
+          {/* 3. GROUP BUTTON */}
           <div className="relative" data-popover>
             {isGroupActive ? (
               <div className="inline-flex items-center bg-[#0d3880] text-white border border-[#1d4ea8] rounded-lg text-[12px] font-medium overflow-hidden shadow-xs">
@@ -1038,267 +1088,378 @@ export default function TaskList({
         </div>
       </div>
 
-      {/* Main Table Area */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Table Header with Select All Checkbox */}
-        <div className="flex items-center h-[32px] px-3 border-b border-[#2b2c2e] text-[#8a8886] font-semibold text-[11px] uppercase tracking-wider select-none bg-[#1e1f21] sticky top-0 z-10">
-          <div
-            className="w-[24px] flex items-center justify-center shrink-0 cursor-pointer"
-            onClick={handleSelectAllVisible}
-            title="Select all"
-          >
-            <div
-              className={`w-3.5 h-3.5 rounded border transition-colors flex items-center justify-center ${
-                selectedTaskIds.size === sortedTasks.length && sortedTasks.length > 0
-                  ? 'bg-[#4573d2] border-[#4573d2]'
-                  : selectedTaskIds.size > 0
-                  ? 'bg-[#4573d2]/30 border-[#4573d2]'
-                  : 'border-[#555659] hover:border-[#8a8886]'
-              }`}
-            >
-              {selectedTaskIds.size === sortedTasks.length && sortedTasks.length > 0 && (
-                <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
-              )}
-              {selectedTaskIds.size > 0 && selectedTaskIds.size < sortedTasks.length && (
-                <div className="w-1.5 h-0.5 bg-[#4573d2]" />
-              )}
-            </div>
-          </div>
-
-          <div className="w-[24px] shrink-0" />
-          <div className="flex-1 min-w-[200px] pr-4">Name</div>
-
-          {columns.project && (
-            <div className="w-[170px] hidden md:block px-2">Projects</div>
-          )}
-
-          {columns.dueDate && (
-            <div className="w-[130px] hidden sm:block px-2">Due Date</div>
-          )}
-
-          {columns.priority && (
-            <div className="w-[110px] hidden md:block px-2">Priority</div>
-          )}
-
-          {columns.visibility && (
-            <div className="w-[130px] hidden lg:block px-2">Task visibility</div>
-          )}
-
-          <div className="w-[60px] flex items-center justify-center">
-            <button
-              onClick={() => setIsListOptionsDrawerOpen(true)}
-              className="p-1 hover:text-white rounded hover:bg-[#28292c]"
-              title="Customize columns"
-            >
-              <Plus className="w-3.5 h-3.5 text-[#6d6c6e]" />
-            </button>
-          </div>
-        </div>
-
-        {/* Grouped Sections */}
-        <div className="pb-24">
-          {groupedData.map((group) => {
-            const isCollapsed = collapsedSections[group.id];
-
-            return (
-              <div key={group.id} className="border-b border-[#252628]">
-                {/* Section Header */}
-                <div className="flex items-center justify-between px-3 py-2 hover:bg-[#252628]/70 group text-[13px] font-bold text-white transition-colors cursor-pointer">
-                  <div
-                    onClick={() => toggleSection(group.id)}
-                    className="flex items-center gap-2 flex-1"
-                  >
-                    {isCollapsed ? (
-                      <ChevronRight className="w-4 h-4 text-[#8a8886] group-hover:text-white" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-[#8a8886] group-hover:text-white" />
-                    )}
-
-                    {editingSectionName === group.id ? (
-                      <input
-                        type="text"
-                        autoFocus
-                        value={editSectionValue}
-                        onChange={(e) => setEditSectionValue(e.target.value)}
-                        onBlur={() => handleSaveRenameSection(group.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveRenameSection(group.id);
-                          if (e.key === 'Escape') setEditingSectionName(null);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="bg-[#1e1f21] border border-[#4573d2] rounded px-1.5 py-0.5 text-white text-[13px] outline-none"
-                      />
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span>{group.groupName}</span>
-                        <span className="text-[11px] font-normal text-[#8a8886] bg-[#2a2b2d] px-1.5 py-0.2 rounded-full">
-                          {group.tasks.length}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Section Hover Actions */}
-                  <div className="relative flex items-center opacity-0 group-hover:opacity-100 transition-opacity" data-popover>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setInlineNewTaskSection(group.id);
-                      }}
-                      className="p-1 hover:bg-[#323336] rounded text-[#8a8886] hover:text-white mr-1"
-                      title="Add task to section"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenSectionMenu((prev) => (prev === group.id ? null : group.id));
-                      }}
-                      className="p-1 hover:bg-[#323336] rounded text-[#8a8886] hover:text-white"
-                      title="Section actions"
-                    >
-                      <MoreHorizontal className="w-3.5 h-3.5" />
-                    </button>
-
-                    {openSectionMenu === group.id && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute right-0 top-7 w-44 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-30 text-[13px]"
-                      >
-                        <button
-                          onClick={() => {
-                            setInlineNewTaskSection(group.id);
-                            setOpenSectionMenu(null);
-                          }}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
-                        >
-                          <Plus className="w-3.5 h-3.5 text-[#8a8886]" />
-                          <span>Add task</span>
-                        </button>
-                        <button
-                          onClick={() => handleStartRenameSection(group.id)}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
-                        >
-                          <Edit2 className="w-3.5 h-3.5 text-[#8a8886]" />
-                          <span>Rename section</span>
-                        </button>
-                        {sections.length > 1 && (
-                          <button
-                            onClick={() => handleDeleteSection(group.id)}
-                            className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#ff6b72] hover:bg-[#2f3135] transition-colors border-t border-[#37383b] mt-1 pt-1.5"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-[#ff6b72]" />
-                            <span>Delete section</span>
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+      {/* Main Table Area with Horizontal Scrolling */}
+      <div className="flex-1 overflow-x-auto overflow-y-auto w-full">
+        <div className="min-w-max">
+          {/* Table Header */}
+          <div className="flex items-center h-[34px] border-b border-[#2b2c2e] text-[#8a8886] font-semibold text-[11px] select-none bg-[#1e1f21] sticky top-0 z-20">
+            {/* Sticky Name Column Header */}
+            <div className="w-[340px] sm:w-[400px] lg:w-[460px] shrink-0 sticky left-0 z-30 bg-[#1e1f21] border-r border-[#2b2c2e] px-3 flex items-center h-full">
+              <div
+                className="w-[24px] flex items-center justify-center shrink-0 cursor-pointer"
+                onClick={handleSelectAllVisible}
+                title="Select all"
+              >
+                <div
+                  className={`w-3.5 h-3.5 rounded border transition-colors flex items-center justify-center ${
+                    selectedTaskIds.size === sortedTasks.length && sortedTasks.length > 0
+                      ? 'bg-[#4573d2] border-[#4573d2]'
+                      : selectedTaskIds.size > 0
+                      ? 'bg-[#4573d2]/30 border-[#4573d2]'
+                      : 'border-[#555659] hover:border-[#8a8886]'
+                  }`}
+                >
+                  {selectedTaskIds.size === sortedTasks.length && sortedTasks.length > 0 && (
+                    <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                  )}
+                  {selectedTaskIds.size > 0 && selectedTaskIds.size < sortedTasks.length && (
+                    <div className="w-1.5 h-0.5 bg-[#4573d2]" />
+                  )}
                 </div>
-
-                {/* Section Tasks */}
-                {!isCollapsed && (
-                  <div>
-                    {group.tasks.map((task) => (
-                      <TaskRow
-                        key={task.id}
-                        task={task}
-                        isSelected={selectedTaskIds.has(task.id)}
-                        onToggleSelect={() => handleToggleSelectTask(task.id)}
-                        showProjectColumn={columns.project}
-                        showDueDateColumn={columns.dueDate}
-                        showPriorityColumn={columns.priority}
-                        showVisibilityColumn={columns.visibility}
-                        onMoveSection={(sec) => updateTask(task.id, { myTasksSection: sec })}
-                      />
-                    ))}
-
-                    {/* Inline Task Creation Row */}
-                    {inlineNewTaskSection === group.id ? (
-                      <div className="flex items-center h-[38px] px-8 border-b border-[#2b2c2e] bg-[#252628]">
-                        <input
-                          type="text"
-                          autoFocus
-                          placeholder="Write a task name..."
-                          value={inlineTaskName}
-                          onChange={(e) => setInlineTaskName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleInlineCreate(group.id);
-                            if (e.key === 'Escape') setInlineNewTaskSection(null);
-                          }}
-                          className="w-full bg-transparent text-white text-[13px] outline-none"
-                        />
-                        <button
-                          onClick={() => handleInlineCreate(group.id)}
-                          className="text-[12px] bg-[#4573d2] text-white px-2.5 py-0.5 rounded font-medium ml-2"
-                        >
-                          Add
-                        </button>
-                        <button
-                          onClick={() => setInlineNewTaskSection(null)}
-                          className="text-[12px] text-[#8a8886] hover:text-white px-2 py-0.5 ml-1"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setInlineNewTaskSection(group.id)}
-                        className="flex items-center gap-2 h-[34px] px-10 text-[12px] text-[#8a8886] hover:text-white hover:bg-[#252628] w-full text-left transition-colors"
-                      >
-                        <Plus className="w-3.5 h-3.5 text-[#6d6c6e]" />
-                        <span>Add task</span>
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
-            );
-          })}
 
-          {/* Add Section Button / Input */}
-          {groupField === 'section' && (
-            <div className="px-4 py-3">
-              {isAddingSection ? (
-                <div className="flex items-center gap-2 max-w-sm">
+              <div className="w-[28px] shrink-0" />
+              <div
+                onClick={() => {
+                  setSortField('alphabetical');
+                  setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                }}
+                className="flex items-center gap-1.5 text-white hover:text-white cursor-pointer group"
+              >
+                <span className="font-medium text-[12px]">Name</span>
+                <ArrowUpDown className="w-3.5 h-3.5 text-[#6d6c6e] group-hover:text-white transition-colors" />
+              </div>
+            </div>
+
+            {/* Horizontally Scrollable Column Headers */}
+            {columns.dueDate && (
+              <div className="w-[140px] shrink-0 border-r border-[#2b2c2e] px-3 flex items-center h-full font-medium text-[12px] text-white">
+                Due date
+              </div>
+            )}
+
+            {columns.collaborators && (
+              <div className="w-[150px] shrink-0 border-r border-[#2b2c2e] px-3 flex items-center h-full font-medium text-[12px] text-white">
+                Collaborators
+              </div>
+            )}
+
+            {columns.project && (
+              <div className="w-[190px] shrink-0 border-r border-[#2b2c2e] px-3 flex items-center h-full font-medium text-[12px] text-white">
+                Projects
+              </div>
+            )}
+
+            {columns.visibility && (
+              <div className="w-[150px] shrink-0 border-r border-[#2b2c2e] px-3 flex items-center h-full font-medium text-[12px] text-white">
+                Task visibility
+              </div>
+            )}
+
+            {/* Dynamic Custom Column Headers */}
+            {customColumns.map((col) => (
+              <div
+                key={col.id}
+                className="w-[150px] shrink-0 border-r border-[#2b2c2e] px-3 flex items-center justify-between h-full font-medium text-[12px] text-white group/col"
+              >
+                <span className="truncate">{col.name}</span>
+                <button
+                  onClick={() => handleDeleteCustomColumn(col.id)}
+                  className="opacity-0 group-hover/col:opacity-100 hover:text-[#ff6b72] text-[#8a8886] p-0.5 rounded transition-opacity"
+                  title="Remove column"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+
+            {/* + Add Column Button & Popover (Exact Asana Screenshot) */}
+            <div className="relative shrink-0 flex items-center h-full" data-popover>
+              {isAddColumnOpen ? (
+                <div className="flex items-center px-2 relative">
                   <input
-                    type="text"
                     autoFocus
-                    placeholder="New section name..."
-                    value={newSectionTitle}
-                    onChange={(e) => setNewSectionTitle(e.target.value)}
+                    placeholder="New field"
+                    value={newColumnName}
+                    onChange={(e) => setNewColumnName(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleCreateSection();
-                      if (e.key === 'Escape') setIsAddingSection(false);
+                      if (e.key === 'Enter') handleCreateCustomColumn('text');
+                      if (e.key === 'Escape') setIsAddColumnOpen(false);
                     }}
-                    className="bg-[#252628] border border-[#4573d2] rounded px-3 py-1 text-white text-[13px] outline-none flex-1"
+                    className="bg-[#1e1f21] border border-[#4573d2] rounded-md px-2.5 py-0.5 text-white text-[12.5px] outline-none w-[170px]"
                   />
-                  <button
-                    onClick={handleCreateSection}
-                    className="bg-[#4573d2] text-white text-[12px] px-3 py-1 rounded font-medium hover:bg-[#3562be]"
-                  >
-                    Add section
-                  </button>
-                  <button
-                    onClick={() => setIsAddingSection(false)}
-                    className="text-[#8a8886] hover:text-white text-[12px] px-2"
-                  >
-                    Cancel
-                  </button>
+
+                  {/* Asana Field Types Dropdown Popover */}
+                  <div className="absolute left-2 top-full mt-1.5 w-[220px] bg-[#252628] border border-[#383a3d] rounded-xl shadow-2xl py-1.5 z-50 text-[13px] animate-in fade-in duration-150">
+                    <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886]">
+                      Field types
+                    </div>
+
+                    {[
+                      { id: 'single_select', label: 'Single-select', icon: CheckCircle2 },
+                      { id: 'multi_select', label: 'Multi-select', icon: CheckSquare },
+                      { id: 'date', label: 'Date', icon: CalendarIcon },
+                      { id: 'people', label: 'People', icon: User },
+                      { id: 'reference', label: 'Reference', icon: Target },
+                      { id: 'text', label: 'Text', icon: Type },
+                      { id: 'number', label: 'Number', icon: Hash },
+                      { id: 'formula', label: 'Formula', icon: Code },
+                      { id: 'timer', label: 'Timer', icon: Timer },
+                      { id: 'time_tracking', label: 'Time tracking', icon: Clock },
+                      { id: 'rollup', label: 'Rollup', icon: ChevronUp },
+                    ].map((ft) => {
+                      const IconComp = ft.icon;
+                      return (
+                        <button
+                          key={ft.id}
+                          onClick={() => handleCreateCustomColumn(ft.id as any, ft.label)}
+                          className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
+                        >
+                          <IconComp className="w-4 h-4 text-[#8a8886]" />
+                          <span>{ft.label}</span>
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      onClick={() => alert('Show more field types')}
+                      className="w-full text-left px-3 py-1.5 text-[12px] text-[#4573d2] hover:underline"
+                    >
+                      Show more
+                    </button>
+
+                    <div className="border-t border-[#37383b] my-1" />
+
+                    <button
+                      onClick={() => alert('Choose from library')}
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
+                    >
+                      <Library className="w-4 h-4 text-[#8a8886]" />
+                      <span>Choose from library</span>
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <button
-                  onClick={() => setIsAddingSection(true)}
-                  className="flex items-center gap-2 text-[13px] font-medium text-[#8a8886] hover:text-white transition-colors py-1"
+                  onClick={() => setIsAddColumnOpen(true)}
+                  className="px-3 py-1 text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors h-full flex items-center justify-center"
+                  title="Add field"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Add section</span>
+                  <Plus className="w-3.5 h-3.5 text-[#8a8886] hover:text-white" />
                 </button>
               )}
             </div>
-          )}
+          </div>
+
+          {/* Grouped Sections with Synchronized Horizontal Table Rows */}
+          <div className="pb-24">
+            {groupedData.map((group) => {
+              const isCollapsed = collapsedSections[group.id];
+
+              return (
+                <div key={group.id} className="border-b border-[#252628]">
+                  {/* Section Header */}
+                  <div className="flex items-center justify-between px-3 py-2 hover:bg-[#252628]/70 group text-[13px] font-bold text-white transition-colors cursor-pointer">
+                    <div
+                      onClick={() => toggleSection(group.id)}
+                      className="flex items-center gap-2 flex-1"
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight className="w-4 h-4 text-[#8a8886] group-hover:text-white" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-[#8a8886] group-hover:text-white" />
+                      )}
+
+                      {editingSectionName === group.id ? (
+                        <input
+                          type="text"
+                          autoFocus
+                          value={editSectionValue}
+                          onChange={(e) => setEditSectionValue(e.target.value)}
+                          onBlur={() => handleSaveRenameSection(group.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveRenameSection(group.id);
+                            if (e.key === 'Escape') setEditingSectionName(null);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="bg-[#1e1f21] border border-[#4573d2] rounded px-1.5 py-0.5 text-white text-[13px] outline-none"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span>{group.groupName}</span>
+                          <span className="text-[11px] font-normal text-[#8a8886] bg-[#2a2b2d] px-1.5 py-0.2 rounded-full">
+                            {group.tasks.length}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative flex items-center opacity-0 group-hover:opacity-100 transition-opacity" data-popover>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInlineNewTaskSection(group.id);
+                        }}
+                        className="p-1 hover:bg-[#323336] rounded text-[#8a8886] hover:text-white mr-1"
+                        title="Add task to section"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenSectionMenu((prev) => (prev === group.id ? null : group.id));
+                        }}
+                        className="p-1 hover:bg-[#323336] rounded text-[#8a8886] hover:text-white"
+                        title="Section actions"
+                      >
+                        <MoreHorizontal className="w-3.5 h-3.5" />
+                      </button>
+
+                      {openSectionMenu === group.id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-7 w-44 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-30 text-[13px]"
+                        >
+                          <button
+                            onClick={() => {
+                              setInlineNewTaskSection(group.id);
+                              setOpenSectionMenu(null);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
+                          >
+                            <Plus className="w-3.5 h-3.5 text-[#8a8886]" />
+                            <span>Add task</span>
+                          </button>
+                          <button
+                            onClick={() => handleStartRenameSection(group.id)}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-[#8a8886]" />
+                            <span>Rename section</span>
+                          </button>
+                          {sections.length > 1 && (
+                            <button
+                              onClick={() => handleDeleteSection(group.id)}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#ff6b72] hover:bg-[#2f3135] transition-colors border-t border-[#37383b] mt-1 pt-1.5"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-[#ff6b72]" />
+                              <span>Delete section</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Section Tasks Table Rows */}
+                  {!isCollapsed && (
+                    <div>
+                      {group.tasks.map((task) => (
+                        <TaskRow
+                          key={task.id}
+                          task={task}
+                          isSelected={selectedTaskIds.has(task.id)}
+                          onToggleSelect={() => handleToggleSelectTask(task.id)}
+                          showProjectColumn={columns.project}
+                          showDueDateColumn={columns.dueDate}
+                          showVisibilityColumn={columns.visibility}
+                          showCollaboratorsColumn={columns.collaborators}
+                          customColumns={customColumns}
+                          onUpdateCustomField={(taskId, fieldId, value) => {
+                            const cur = task.customFields || {};
+                            updateTask(taskId, { customFields: { ...cur, [fieldId]: value } });
+                          }}
+                          onMoveSection={(sec) => updateTask(task.id, { myTasksSection: sec })}
+                        />
+                      ))}
+
+                      {/* Inline Task Creation Row */}
+                      {inlineNewTaskSection === group.id ? (
+                        <div className="flex items-center h-[38px] px-8 border-b border-[#2b2c2e] bg-[#252628] w-full">
+                          <input
+                            type="text"
+                            autoFocus
+                            placeholder="Write a task name..."
+                            value={inlineTaskName}
+                            onChange={(e) => setInlineTaskName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleInlineCreate(group.id);
+                              if (e.key === 'Escape') setInlineNewTaskSection(null);
+                            }}
+                            className="w-full max-w-sm bg-transparent text-white text-[13px] outline-none"
+                          />
+                          <button
+                            onClick={() => handleInlineCreate(group.id)}
+                            className="text-[12px] bg-[#4573d2] text-white px-2.5 py-0.5 rounded font-medium ml-2"
+                          >
+                            Add
+                          </button>
+                          <button
+                            onClick={() => setInlineNewTaskSection(null)}
+                            className="text-[12px] text-[#8a8886] hover:text-white px-2 py-0.5 ml-1"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setInlineNewTaskSection(group.id)}
+                          className="flex items-center gap-2 h-[34px] px-10 text-[12px] text-[#8a8886] hover:text-white hover:bg-[#252628] w-full text-left transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-[#6d6c6e]" />
+                          <span>Add task</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Add Section Button / Input */}
+            {groupField === 'section' && (
+              <div className="px-4 py-3">
+                {isAddingSection ? (
+                  <div className="flex items-center gap-2 max-w-sm">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="New section name..."
+                      value={newSectionTitle}
+                      onChange={(e) => setNewSectionTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCreateSection();
+                        if (e.key === 'Escape') setIsAddingSection(false);
+                      }}
+                      className="bg-[#252628] border border-[#4573d2] rounded px-3 py-1 text-white text-[13px] outline-none flex-1"
+                    />
+                    <button
+                      onClick={handleCreateSection}
+                      className="bg-[#4573d2] text-white text-[12px] px-3 py-1 rounded font-medium hover:bg-[#3562be]"
+                    >
+                      Add section
+                    </button>
+                    <button
+                      onClick={() => setIsAddingSection(false)}
+                      className="text-[#8a8886] hover:text-white text-[12px] px-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsAddingSection(true)}
+                    className="flex items-center gap-2 text-[13px] font-medium text-[#8a8886] hover:text-white transition-colors py-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add section</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

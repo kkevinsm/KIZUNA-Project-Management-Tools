@@ -63,6 +63,26 @@ export interface Task {
   comments: Comment[];
   createdAt: string;
   taskType?: 'task' | 'milestone' | 'approval';
+  customFields?: Record<string, string>;
+}
+
+export interface CustomColumn {
+  id: string;
+  name: string;
+  type:
+    | 'single_select'
+    | 'multi_select'
+    | 'date'
+    | 'people'
+    | 'reference'
+    | 'text'
+    | 'number'
+    | 'formula'
+    | 'timer'
+    | 'time_tracking'
+    | 'rollup';
+  options?: string[];
+  width?: number;
 }
 
 export interface Project {
