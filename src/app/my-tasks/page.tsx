@@ -96,11 +96,10 @@ export default function MyTasksPage() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`pb-2.5 transition-colors relative ${
-                activeTab === tab
+              className={`pb-2.5 transition-colors relative ${activeTab === tab
                   ? 'text-white font-semibold'
                   : 'text-[#8a8886] hover:text-[#bdbbb9]'
-              }`}
+                }`}
             >
               <span>{tab}</span>
               {activeTab === tab && (

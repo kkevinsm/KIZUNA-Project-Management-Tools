@@ -498,3 +498,4 @@ export function FormsWidget({ onRemove }: { onRemove: () => void }) {
     </WidgetContainer>
   );
 }
+
