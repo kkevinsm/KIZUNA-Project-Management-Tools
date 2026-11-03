@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Check,
@@ -14,7 +14,8 @@ import {
   TrendingDown,
   PieChart,
   CircleDot,
-  Radio,
+  MoreHorizontal,
+  Plus,
 } from 'lucide-react';
 import { Task, Project } from '@/lib/types';
 
@@ -28,12 +29,21 @@ export interface ChartFilter {
 export interface ChartConfig {
   id: string;
   title: string;
-  type: 'number' | 'bar' | 'donut' | 'lollipop' | 'line' | 'stacked_bar' | 'grouped_bar' | 'burnup' | 'burndown';
+  type: 'number' | 'bar' | 'stacked_bar' | 'grouped_bar' | 'line' | 'burnup' | 'burndown' | 'donut' | 'lollipop';
+  color: string;
   filterCountText: string;
   filters: ChartFilter[];
   valueType: string;
   aggregation: string;
   size: 'kpi' | 'large';
+  xAxis?: string;
+  groupBy?: string;
+  showAsPercentage?: boolean;
+  dataLabels?: boolean;
+  benchmarkLine?: boolean;
+  timeGranularity?: 'Day' | 'Week' | 'Month';
+  timeDurationValue?: number;
+  timeDurationUnit?: 'Days' | 'Weeks' | 'Months';
 }
 
 const CHART_STYLES = [
@@ -48,6 +58,43 @@ const CHART_STYLES = [
   { id: 'lollipop', label: 'Lollipop', icon: CircleDot },
 ] as const;
 
+const PALETTE_COLORS = [
+  { id: 'multi', label: 'Multi-color', value: '#a8a5f8', isMulti: true },
+  { id: 'coral', label: 'Coral', value: '#f06a6a' },
+  { id: 'orange', label: 'Orange', value: '#ec8c38' },
+  { id: 'amber', label: 'Amber', value: '#f1bd3e' },
+  { id: 'yellow', label: 'Yellow', value: '#f6d953' },
+  { id: 'lime', label: 'Lime', value: '#bfe764' },
+  { id: 'green', label: 'Green', value: '#70db8a' },
+  { id: 'teal', label: 'Teal', value: '#4edab8' },
+  { id: 'mint', label: 'Mint', value: '#75ebd6' },
+  { id: 'blue', label: 'Light Blue', value: '#7fc2f5' },
+  { id: 'lavender', label: 'Lavender', value: '#9d9af7' },
+  { id: 'purple', label: 'Purple', value: '#c78bf5' },
+  { id: 'pink', label: 'Pink', value: '#f397d6' },
+  { id: 'rose', label: 'Rose', value: '#f79bb7' },
+  { id: 'gray', label: 'Gray', value: '#9e9e9e' },
+  { id: 'lightgray', label: 'Light Gray', value: '#d0d0d0' },
+];
+
+const X_AXIS_OPTIONS = [
+  'Assignee',
+  'Creator',
+  'Section',
+  'Task type',
+  'Completion status',
+  'Due date status',
+  'Project',
+];
+
+const GROUP_BY_OPTIONS = [
+  'Due date status',
+  'Completion status',
+  'Priority',
+  'Task type',
+  'Section',
+];
+
 interface EditChartModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -56,6 +103,7 @@ interface EditChartModalProps {
   tasks: Task[];
   sections: string[];
   projects: Project[];
+  isNew?: boolean;
 }
 
 export default function EditChartModal({
@@ -66,23 +114,43 @@ export default function EditChartModal({
   tasks,
   sections,
   projects,
+  isNew = false,
 }: EditChartModalProps) {
-  const [currentChart, setCurrentChart] = useState<ChartConfig | null>(chart);
+  const [currentChart, setCurrentChart] = useState<ChartConfig | null>(null);
   const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const [isXAxisOpen, setIsXAxisOpen] = useState(false);
+  const [isGroupByOpen, setIsGroupByOpen] = useState(false);
   const [isValueDropdownOpen, setIsValueDropdownOpen] = useState(false);
   const [isCountDropdownOpen, setIsCountDropdownOpen] = useState(false);
   const [isAddFilterOpen, setIsAddFilterOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
   useEffect(() => {
-    setCurrentChart(chart ? { ...chart, filters: [...chart.filters] } : null);
+    if (chart) {
+      setCurrentChart({
+        ...chart,
+        color: chart.color || '#a8a5f8',
+        xAxis: chart.xAxis || 'Section',
+        groupBy: chart.groupBy || 'Due date status',
+        dataLabels: chart.dataLabels !== false,
+        benchmarkLine: !!chart.benchmarkLine,
+        showAsPercentage: !!chart.showAsPercentage,
+        timeGranularity: chart.timeGranularity || 'Day',
+        timeDurationValue: chart.timeDurationValue || 2,
+        timeDurationUnit: chart.timeDurationUnit || 'Weeks',
+        filters: [...chart.filters],
+      });
+    }
   }, [chart]);
 
   if (!isOpen || !currentChart) return null;
 
-  const activeStyle = CHART_STYLES.find((s) => s.id === currentChart.type) || CHART_STYLES[7];
+  const activeStyle = CHART_STYLES.find((s) => s.id === currentChart.type) || CHART_STYLES[0];
   const ActiveIcon = activeStyle.icon;
+  const chartColor = currentChart.color || '#a8a5f8';
 
-  // Evaluate task count based on filters
+  // Compute metric for preview
   const computeValue = () => {
     return tasks.filter((t) => {
       for (const f of currentChart.filters) {
@@ -95,19 +163,42 @@ export default function EditChartModal({
           const due = new Date(t.dueDate);
           if (isNaN(due.getTime()) || due >= new Date()) return false;
         }
-        if (f.field === 'section' && t.section !== f.value) {
-          return false;
-        }
-        if (f.field === 'project' && t.projectId !== f.value) {
-          return false;
-        }
+        if (f.field === 'section' && t.section !== f.value) return false;
+        if (f.field === 'project' && t.projectId !== f.value) return false;
       }
       return true;
     }).length;
   };
 
   const handleSelectStyle = (type: ChartConfig['type']) => {
-    setCurrentChart((prev) => (prev ? { ...prev, type, size: type === 'number' ? 'kpi' : 'large' } : null));
+    setCurrentChart((prev) => {
+      if (!prev) return null;
+      let newTitle = prev.title;
+      if (type === 'stacked_bar' || type === 'grouped_bar') {
+        newTitle = 'Total tasks by section and task due date status';
+      } else if (type === 'burnup') {
+        newTitle = 'Task completion over time';
+      } else if (type === 'burndown') {
+        newTitle = 'Tasks remaining over time';
+      } else if (type === 'donut') {
+        newTitle = 'Total tasks by section';
+      } else if (type === 'number') {
+        newTitle = 'Total tasks';
+      } else if (type === 'lollipop') {
+        newTitle = 'Total tasks by section';
+      } else if (type === 'line') {
+        newTitle = 'Total tasks by section';
+      } else if (type === 'bar') {
+        newTitle = 'Total tasks by section';
+      }
+
+      return {
+        ...prev,
+        type,
+        title: newTitle,
+        size: type === 'number' ? 'kpi' : 'large',
+      };
+    });
     setIsStyleDropdownOpen(false);
   };
 
@@ -147,25 +238,38 @@ export default function EditChartModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-6 select-none animate-in fade-in duration-150">
-      <div className="bg-[#1e1f21] border border-[#37383b] rounded-2xl w-full max-w-5xl h-[620px] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-[#1e1f21] border border-[#37383b] rounded-2xl w-full max-w-5xl h-[640px] flex flex-col shadow-2xl overflow-hidden">
         {/* Top Header */}
         <div className="h-12 px-5 border-b border-[#2b2c2e] flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold text-white">Edit chart</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded-md text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <h2 className="text-[15px] font-semibold text-white">
+            {isNew ? 'Add chart' : 'Edit chart'}
+          </h2>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setIsMoreMenuOpen((v) => !v)}
+              className="p-1.5 rounded-md text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors cursor-pointer"
+              title="More options"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-md text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}
         <div className="flex-1 flex overflow-hidden">
           {/* Left Pane: Live Chart Preview */}
           <div className="flex-1 bg-[#17181a] p-8 flex flex-col justify-between relative overflow-hidden">
-            {/* Chart Title in Preview */}
-            <div className="self-start">
+            {/* Chart Title */}
+            <div className="self-start w-full">
               <input
                 type="text"
                 value={currentChart.title}
@@ -176,117 +280,416 @@ export default function EditChartModal({
             </div>
 
             {/* Live Chart Center Visual */}
-            <div className="flex-1 flex items-center justify-center my-6">
+            <div className="flex-1 flex items-center justify-center my-4 w-full">
+              {/* 1. NUMBER */}
               {currentChart.type === 'number' && (
                 <div className="flex flex-col items-center">
-                  <span className="text-[80px] font-light text-white tracking-tight leading-none">
-                    {calculatedNumber}
+                  <span className="text-[88px] font-light text-white tracking-tight leading-none">
+                    {calculatedNumber || 3}
                   </span>
                 </div>
               )}
 
+              {/* 2. BAR */}
               {currentChart.type === 'bar' && (
-                <div className="w-full max-w-md h-[240px] flex flex-col justify-end">
-                  <div className="flex items-end justify-around h-[180px] border-b border-[#37383b] px-4 gap-6">
-                    {sections.map((sec, idx) => {
-                      const count = tasks.filter((t) => t.section === sec).length;
-                      const height = count > 0 ? `${Math.min(100, (count / 4) * 100)}%` : '4px';
-                      return (
-                        <div key={sec} className="flex flex-col items-center flex-1 h-full justify-end">
-                          <span className="text-[12px] font-bold text-white mb-1.5">{count}</span>
-                          <div
-                            className="w-10 bg-[#a8a5f8] rounded-t-md transition-all duration-300"
-                            style={{ height }}
-                          />
-                        </div>
-                      );
-                    })}
+                <div className="w-full max-w-lg h-[240px] flex items-center">
+                  <div className="h-full flex items-center justify-center pr-3">
+                    <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
+                      Task count
+                    </span>
                   </div>
-                  <div className="flex justify-around pt-3 text-[11px] text-[#8a8886]">
-                    {sections.map((sec) => (
-                      <span key={sec} className="truncate max-w-[80px] text-center">
-                        {sec}
-                      </span>
-                    ))}
+                  <div className="flex-1 h-full flex flex-col justify-between">
+                    <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
+                      {[5, 4, 3, 2, 1, 0].map((val) => (
+                        <div key={val} className="w-full border-b border-[#2d2f33] relative flex items-center">
+                          <span className="absolute -left-4 text-[9px] text-[#8a8886]">{val}</span>
+                        </div>
+                      ))}
+                      {currentChart.benchmarkLine && (
+                        <div className="absolute top-[35%] left-0 right-0 border-t-2 border-dashed border-[#f1bd3e] z-10">
+                          <span className="absolute right-2 -top-4 text-[9px] text-[#f1bd3e]">Benchmark: 3</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 flex items-end justify-around px-4">
+                        {sections.map((sec, idx) => {
+                          const count = idx === 0 ? 3 : 0;
+                          const heightPct = count > 0 ? (count / 5) * 100 : 2;
+                          return (
+                            <div key={sec} className="flex flex-col items-center justify-end h-full w-12">
+                              {currentChart.dataLabels && (
+                                <span className="text-[11px] font-bold text-white mb-1">{count}</span>
+                              )}
+                              <div
+                                className="w-9 rounded-t-xs transition-all duration-300"
+                                style={{ height: `${heightPct}%`, backgroundColor: chartColor }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="flex justify-around pt-3 text-[10px] text-[#8a8886]">
+                      {sections.map((sec) => (
+                        <span key={sec} className="truncate max-w-[70px] -rotate-35 origin-top-left transform translate-y-1">
+                          {sec}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
 
+              {/* 3. STACKED BAR (Image 2) */}
+              {currentChart.type === 'stacked_bar' && (
+                <div className="w-full max-w-lg h-[240px] flex items-center">
+                  <div className="h-full flex items-center justify-center pr-3">
+                    <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
+                      Task count
+                    </span>
+                  </div>
+                  <div className="flex-1 h-full flex flex-col justify-between">
+                    <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
+                      {[5, 4, 3, 2, 1, 0].map((val) => (
+                        <div key={val} className="w-full border-b border-[#2d2f33] relative flex items-center">
+                          <span className="absolute -left-4 text-[9px] text-[#8a8886]">{val}</span>
+                        </div>
+                      ))}
+                      <div className="absolute inset-0 flex items-end justify-around px-4">
+                        {/* Recently assigned stacked bar */}
+                        <div className="flex flex-col items-center justify-end h-full w-12">
+                          {currentChart.dataLabels && (
+                            <span className="text-[11px] font-bold text-white mb-1">3</span>
+                          )}
+                          <div className="w-9 rounded-t-xs overflow-hidden flex flex-col justify-end" style={{ height: '60%' }}>
+                            {/* Overdue (top part: 1) */}
+                            <div className="bg-[#bfe764] h-[33%] w-full flex items-center justify-center text-[10px] font-bold text-black">
+                              {currentChart.dataLabels && '1'}
+                            </div>
+                            {/* Upcoming (bottom part: 2) */}
+                            <div className="bg-[#a8a5f8] h-[67%] w-full flex items-center justify-center text-[10px] font-bold text-black">
+                              {currentChart.dataLabels && '2'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {sections.slice(1).map((sec) => (
+                          <div key={sec} className="flex flex-col items-center justify-end h-full w-12">
+                            {currentChart.dataLabels && (
+                              <span className="text-[11px] font-bold text-white mb-1">0</span>
+                            )}
+                            <div className="w-9 h-0.5 bg-[#3e4044]" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex justify-around pt-3 text-[10px] text-[#8a8886]">
+                      {sections.map((sec) => (
+                        <span key={sec} className="truncate max-w-[70px] -rotate-35 origin-top-left transform translate-y-1">
+                          {sec}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Legend on right */}
+                  <div className="ml-6 space-y-2 text-[11px] text-[#cfcecd]">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-xs bg-[#75ebd6]" />
+                      <span>Unscheduled</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-xs bg-[#f79bb7]" />
+                      <span>Completed</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-xs bg-[#bfe764]" />
+                      <span>Overdue</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-xs bg-[#a8a5f8]" />
+                      <span>Upcoming</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. GROUPED BAR (Image 3) */}
+              {currentChart.type === 'grouped_bar' && (
+                <div className="w-full max-w-lg h-[240px] flex items-center">
+                  <div className="h-full flex items-center justify-center pr-3">
+                    <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
+                      Task count
+                    </span>
+                  </div>
+                  <div className="flex-1 h-full flex flex-col justify-between">
+                    <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
+                      {[5, 4, 3, 2, 1, 0].map((val) => (
+                        <div key={val} className="w-full border-b border-[#2d2f33] relative flex items-center">
+                          <span className="absolute -left-4 text-[9px] text-[#8a8886]">{val}</span>
+                        </div>
+                      ))}
+                      <div className="absolute inset-0 flex items-end justify-around px-4">
+                        {/* Recently assigned has 2 side-by-side bars */}
+                        <div className="flex items-end gap-1 h-full">
+                          <div className="flex flex-col items-center justify-end h-full">
+                            {currentChart.dataLabels && <span className="text-[10px] font-bold text-white mb-0.5">2</span>}
+                            <div className="w-7 h-[40%] bg-[#a8a5f8] rounded-t-xs" />
+                          </div>
+                          <div className="flex flex-col items-center justify-end h-full">
+                            {currentChart.dataLabels && <span className="text-[10px] font-bold text-white mb-0.5">1</span>}
+                            <div className="w-7 h-[20%] bg-[#bfe764] rounded-t-xs" />
+                          </div>
+                        </div>
+
+                        {sections.slice(1, 2).map((sec) => (
+                          <div key={sec} className="flex items-end gap-1 h-full">
+                            <div className="flex flex-col items-center justify-end h-full">
+                              {currentChart.dataLabels && <span className="text-[10px] font-bold text-white mb-0.5">0</span>}
+                              <div className="w-7 h-0.5 bg-[#3e4044]" />
+                            </div>
+                            <div className="flex flex-col items-center justify-end h-full">
+                              {currentChart.dataLabels && <span className="text-[10px] font-bold text-white mb-0.5">0</span>}
+                              <div className="w-7 h-0.5 bg-[#3e4044]" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex justify-around pt-3 text-[10px] text-[#8a8886]">
+                      {sections.slice(0, 2).map((sec) => (
+                        <span key={sec} className="truncate max-w-[80px] -rotate-35 origin-top-left transform translate-y-1">
+                          {sec}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="ml-6 space-y-2 text-[11px] text-[#cfcecd]">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-xs bg-[#a8a5f8]" />
+                      <span>Upcoming</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-xs bg-[#bfe764]" />
+                      <span>Overdue</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-xs bg-[#f79bb7]" />
+                      <span>Completed</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-xs bg-[#75ebd6]" />
+                      <span>Unscheduled</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 5. LINE (Image 4) */}
+              {currentChart.type === 'line' && (
+                <div className="w-full max-w-lg h-[240px] flex items-center">
+                  <div className="h-full flex items-center justify-center pr-3">
+                    <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
+                      Task count
+                    </span>
+                  </div>
+                  <div className="flex-1 h-full flex flex-col justify-between">
+                    <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
+                      {[5, 4, 3, 2, 1, 0].map((val) => (
+                        <div key={val} className="w-full border-b border-[#2d2f33] relative flex items-center">
+                          <span className="absolute -left-4 text-[9px] text-[#8a8886]">{val}</span>
+                        </div>
+                      ))}
+                      <div className="absolute inset-0">
+                        <svg className="w-full h-full" viewBox="0 0 300 120" preserveAspectRatio="none">
+                          <path
+                            d="M 37 48 L 112 120 L 187 120 L 262 120"
+                            fill="none"
+                            stroke={chartColor}
+                            strokeWidth="2"
+                          />
+                          {/* Points */}
+                          <circle cx="37" cy="48" r="3.5" fill={chartColor} />
+                          <circle cx="112" cy="120" r="3.5" fill={chartColor} />
+                          <circle cx="187" cy="120" r="3.5" fill={chartColor} />
+                          <circle cx="262" cy="120" r="3.5" fill={chartColor} />
+                          {currentChart.dataLabels && (
+                            <>
+                              <text x="37" y="38" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle">3</text>
+                              <text x="112" y="112" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle">0</text>
+                              <text x="187" y="112" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle">0</text>
+                              <text x="262" y="112" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle">0</text>
+                            </>
+                          )}
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="flex justify-around pt-3 text-[10px] text-[#8a8886]">
+                      {sections.map((sec) => (
+                        <span key={sec} className="truncate max-w-[70px] -rotate-35 origin-top-left transform translate-y-1">
+                          {sec}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 6. BURNUP & BURNDOWN (Image 5 & Batch 2 Image 1) */}
+              {(currentChart.type === 'burnup' || currentChart.type === 'burndown') && (
+                <div className="w-full max-w-lg h-[240px] flex items-center">
+                  <div className="h-full flex items-center justify-center pr-3">
+                    <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
+                      Task count
+                    </span>
+                  </div>
+                  <div className="flex-1 h-full flex flex-col justify-between">
+                    <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
+                      {[5, 4, 3, 2, 1, 0].map((val) => (
+                        <div key={val} className="w-full border-b border-[#2d2f33] relative flex items-center">
+                          <span className="absolute -left-4 text-[9px] text-[#8a8886]">{val}</span>
+                        </div>
+                      ))}
+                      <div className="absolute inset-0 flex items-end">
+                        <svg className="w-full h-full" viewBox="0 0 320 120" preserveAspectRatio="none">
+                          <defs>
+                            <linearGradient id="burnGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={chartColor} stopOpacity="0.8" />
+                              <stop offset="100%" stopColor={chartColor} stopOpacity="0.8" />
+                            </linearGradient>
+                          </defs>
+                          <path
+                            d="M 10 120 L 45 120 L 80 120 L 115 120 L 150 120 L 185 120 L 220 120 L 255 120 L 275 80 L 295 48 L 295 120 Z"
+                            fill="url(#burnGrad)"
+                          />
+                          <path
+                            d="M 10 120 L 45 120 L 80 120 L 115 120 L 150 120 L 185 120 L 220 120 L 255 120 L 275 80 L 295 48"
+                            fill="none"
+                            stroke="#ffffff"
+                            strokeWidth="2"
+                          />
+                          {currentChart.dataLabels && (
+                            <>
+                              <text x="10" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                              <text x="45" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                              <text x="80" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                              <text x="115" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                              <text x="150" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                              <text x="185" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                              <text x="220" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                              <text x="255" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                              <text x="275" y="70" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">2</text>
+                              <text x="295" y="40" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">3</text>
+                            </>
+                          )}
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="flex justify-between pt-2 text-[9px] text-[#8a8886]">
+                      <span>10/25</span>
+                      <span>10/26</span>
+                      <span>10/27</span>
+                      <span>10/28</span>
+                      <span>10/29</span>
+                      <span>10/30</span>
+                      <span>10/31</span>
+                      <span>11/01</span>
+                      <span>11/02</span>
+                      <span>11/03</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-3 pt-2 text-[11px] text-[#8a8886]">
+                      <span className="text-[10px] text-[#8a8886] hover:underline cursor-pointer">+ more</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-xs bg-white" />
+                        <span>Total</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-xs" style={{ backgroundColor: chartColor }} />
+                        <span>{currentChart.type === 'burndown' ? 'Remaining' : 'Completed'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 7. DONUT (Batch 2 Image 2) */}
               {currentChart.type === 'donut' && (
-                <div className="flex items-center gap-10">
-                  <div className="relative w-44 h-44 flex items-center justify-center">
+                <div className="flex items-center justify-around w-full max-w-md">
+                  <div className="relative w-48 h-48 flex items-center justify-center">
                     <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="36" stroke="#252628" strokeWidth="16" fill="transparent" />
                       <circle
                         cx="50"
                         cy="50"
-                        r="38"
-                        stroke="#2a2b2f"
+                        r="36"
+                        stroke={chartColor}
                         strokeWidth="16"
-                        fill="transparent"
-                      />
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="38"
-                        stroke="#a8a5f8"
-                        strokeWidth="16"
-                        strokeDasharray="238.76"
-                        strokeDashoffset="60"
+                        strokeDasharray="226"
+                        strokeDashoffset="0"
                         fill="transparent"
                         strokeLinecap="round"
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-[32px] font-bold text-white leading-none">
-                        {calculatedNumber || 2}
-                      </span>
+                      <span className="text-[34px] font-bold text-white leading-none">3</span>
+                      {currentChart.dataLabels && (
+                        <span className="text-[11px] text-white/80 mt-10">3</span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-xs bg-[#a8a5f8]" />
-                    <span className="text-[13px] text-white">Incomplete</span>
+                    <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: chartColor }} />
+                    <span className="text-[13px] text-[#cfcecd]">Recently assigned</span>
                   </div>
                 </div>
               )}
 
+              {/* 8. LOLLIPOP (Batch 2 Image 4 & 5) */}
               {currentChart.type === 'lollipop' && (
-                <div className="w-full max-w-sm h-[200px] flex items-end justify-center border-b border-[#37383b] pb-2">
-                  <div className="flex flex-col items-center">
-                    <span className="text-[12px] font-bold text-white mb-1">2</span>
-                    <div className="w-3.5 h-3.5 rounded-full bg-[#a8a5f8]" />
-                    <div className="w-1 h-32 bg-[#a8a5f8]" />
-                    <span className="text-[11px] text-[#8a8886] mt-2">Kevin&apos;s first project</span>
+                <div className="w-full max-w-lg h-[240px] flex items-center">
+                  <div className="h-full flex items-center justify-center pr-3">
+                    <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
+                      Task count
+                    </span>
                   </div>
-                </div>
-              )}
-
-              {['line', 'stacked_bar', 'grouped_bar', 'burnup', 'burndown'].includes(currentChart.type) && (
-                <div className="w-full max-w-md h-[200px] flex flex-col justify-end">
-                  <svg className="w-full h-40" viewBox="0 0 300 120">
-                    <defs>
-                      <linearGradient id="editGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#a8a5f8" stopOpacity="0.4" />
-                        <stop offset="100%" stopColor="#a8a5f8" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-                    <path
-                      d="M 10 110 L 80 110 L 150 110 L 220 80 L 290 30 L 290 120 L 10 120 Z"
-                      fill="url(#editGrad)"
-                    />
-                    <path
-                      d="M 10 110 L 80 110 L 150 110 L 220 80 L 290 30"
-                      fill="none"
-                      stroke="#ffffff"
-                      strokeWidth="2.5"
-                    />
-                    <circle cx="220" cy="80" r="3" fill="#ffffff" />
-                    <circle cx="290" cy="30" r="3" fill="#ffffff" />
-                  </svg>
-                  <div className="flex justify-between text-[10px] text-[#8a8886] pt-2 border-t border-[#37383b]">
-                    <span>10/25</span>
-                    <span>10/28</span>
-                    <span>10/31</span>
-                    <span>11/03</span>
+                  <div className="flex-1 h-full flex flex-col justify-between">
+                    <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
+                      {[5, 4, 3, 2, 1, 0].map((val) => (
+                        <div key={val} className="w-full border-b border-[#2d2f33] relative flex items-center">
+                          <span className="absolute -left-4 text-[9px] text-[#8a8886]">{val}</span>
+                        </div>
+                      ))}
+                      <div className="absolute inset-0 flex items-end justify-around px-4">
+                        {sections.map((sec, idx) => {
+                          const count = idx === 0 ? 3 : 0;
+                          const heightPct = count > 0 ? (count / 5) * 100 : 0;
+                          return (
+                            <div key={sec} className="flex flex-col items-center justify-end h-full w-12">
+                              {currentChart.dataLabels && (
+                                <span className="text-[11px] font-bold text-white mb-1">{count}</span>
+                              )}
+                              <div
+                                className="w-2.5 h-2.5 rounded-full shadow-sm"
+                                style={{ backgroundColor: chartColor }}
+                              />
+                              {count > 0 ? (
+                                <div
+                                  className="w-1 transition-all duration-300"
+                                  style={{ height: `${heightPct}%`, backgroundColor: chartColor }}
+                                />
+                              ) : (
+                                <div className="w-1 h-0.5 bg-transparent" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="flex justify-around pt-3 text-[10px] text-[#8a8886]">
+                      {sections.map((sec) => (
+                        <span key={sec} className="truncate max-w-[70px] -rotate-35 origin-top-left transform translate-y-1">
+                          {sec}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -299,8 +702,8 @@ export default function EditChartModal({
 
           {/* Right Pane: Chart details & Chart data */}
           <div className="w-[360px] border-l border-[#2b2c2e] bg-[#1e1f21] flex flex-col justify-between p-5 overflow-y-auto">
-            <div className="space-y-6">
-              {/* Section 1: Chart details */}
+            <div className="space-y-5">
+              {/* Chart details */}
               <div>
                 <h3 className="text-[14px] font-semibold text-white mb-3">Chart details</h3>
                 <div>
@@ -320,9 +723,57 @@ export default function EditChartModal({
                       <ChevronDown className="w-4 h-4 text-[#8a8886]" />
                     </button>
 
-                    {/* Chart Style Dropdown Menu matching Screenshot 4 */}
+                    {/* Chart Style Dropdown Menu matching Image 1 */}
                     {isStyleDropdownOpen && (
-                      <div className="absolute top-11 left-0 right-0 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                      <div className="absolute top-11 left-0 right-0 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 overflow-visible animate-in fade-in zoom-in-95 duration-100">
+                        {/* 1. Set color > with Palette Submenu */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsColorPickerOpen((prev) => !prev)}
+                            className="w-full px-3 py-2 flex items-center justify-between hover:bg-[#2f3135] text-[13px] text-white transition-colors cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <span
+                                className="w-3.5 h-3.5 rounded-xs border border-[#45474c]"
+                                style={{ backgroundColor: chartColor }}
+                              />
+                              <span>Set color</span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-[#8a8886]" />
+                          </button>
+
+                          {/* Color Palette Popover matching Image 1 */}
+                          {isColorPickerOpen && (
+                            <div className="absolute left-full top-0 ml-1.5 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl p-2.5 w-56 animate-in fade-in duration-100">
+                              <div className="grid grid-cols-8 gap-1.5">
+                                {PALETTE_COLORS.map((col) => {
+                                  const isCurrent = currentChart.color === col.value;
+                                  return (
+                                    <button
+                                      key={col.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setCurrentChart((prev) => (prev ? { ...prev, color: col.value } : null));
+                                        setIsColorPickerOpen(false);
+                                        setIsStyleDropdownOpen(false);
+                                      }}
+                                      className="w-5 h-5 rounded-xs flex items-center justify-center hover:scale-115 transition-transform cursor-pointer relative"
+                                      style={{ backgroundColor: col.value }}
+                                      title={col.label}
+                                    >
+                                      {isCurrent && <Check className="w-3 h-3 text-white drop-shadow stroke-[3]" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="h-px bg-[#323438] my-1" />
+
+                        {/* List of Chart Styles */}
                         {CHART_STYLES.map((style) => {
                           const IconComponent = style.icon;
                           const isSelected = currentChart.type === style.id;
@@ -349,29 +800,221 @@ export default function EditChartModal({
 
               <div className="h-px bg-[#2b2c2e]" />
 
-              {/* Section 2: Chart data matching Screenshot 5 */}
+              {/* Chart data */}
               <div>
                 <h3 className="text-[14px] font-semibold text-white mb-3">Chart data</h3>
 
-                {/* Value Dropdowns */}
-                <div>
-                  <label className="text-[11px] text-[#8a8886] font-medium block mb-1.5">
-                    Value
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {/* Task dropdown */}
+                {/* Dynamic Controls based on Chart Style */}
+
+                {/* STACKED BAR / GROUPED BAR: X-axis & Group by */}
+                {(currentChart.type === 'stacked_bar' || currentChart.type === 'grouped_bar') && (
+                  <div className="space-y-3 mb-3">
+                    <div>
+                      <label className="text-[11px] text-[#8a8886] font-medium block mb-1.5">
+                        X-axis
+                      </label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setIsXAxisOpen((v) => !v)}
+                          className="w-full h-10 px-3 bg-[#252628] hover:bg-[#2c2d30] border border-[#37383b] rounded-lg flex items-center justify-between text-white text-[13px] cursor-pointer"
+                        >
+                          <span>{currentChart.xAxis || 'Section'}</span>
+                          <ChevronDown className="w-4 h-4 text-[#8a8886]" />
+                        </button>
+                        {isXAxisOpen && (
+                          <div className="absolute top-11 left-0 right-0 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px]">
+                            {X_AXIS_OPTIONS.map((opt) => (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => {
+                                  setCurrentChart((prev) => (prev ? { ...prev, xAxis: opt } : null));
+                                  setIsXAxisOpen(false);
+                                }}
+                                className="w-full px-3 py-2 text-left hover:bg-[#2f3135] text-white flex items-center justify-between cursor-pointer"
+                              >
+                                <span>{opt}</span>
+                                {currentChart.xAxis === opt && <Check className="w-3.5 h-3.5 text-white" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] text-[#8a8886] font-medium block mb-1.5">
+                        Group by
+                      </label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setIsGroupByOpen((v) => !v)}
+                          className="w-full h-10 px-3 bg-[#252628] hover:bg-[#2c2d30] border border-[#37383b] rounded-lg flex items-center justify-between text-white text-[13px] cursor-pointer"
+                        >
+                          <span>{currentChart.groupBy || 'Due date status'}</span>
+                          <ChevronDown className="w-4 h-4 text-[#8a8886]" />
+                        </button>
+                        {isGroupByOpen && (
+                          <div className="absolute top-11 left-0 right-0 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px]">
+                            {GROUP_BY_OPTIONS.map((opt) => (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => {
+                                  setCurrentChart((prev) => (prev ? { ...prev, groupBy: opt } : null));
+                                  setIsGroupByOpen(false);
+                                }}
+                                className="w-full px-3 py-2 text-left hover:bg-[#2f3135] text-white flex items-center justify-between cursor-pointer"
+                              >
+                                <span>{opt}</span>
+                                {currentChart.groupBy === opt && <Check className="w-3.5 h-3.5 text-white" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* BAR / LINE / LOLLIPOP: X-axis */}
+                {(currentChart.type === 'bar' || currentChart.type === 'line' || currentChart.type === 'lollipop') && (
+                  <div className="mb-3">
+                    <label className="text-[11px] text-[#8a8886] font-medium block mb-1.5">
+                      X-axis
+                    </label>
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => setIsValueDropdownOpen((prev) => !prev)}
-                        className="w-full h-10 px-3 bg-[#252628] hover:bg-[#2c2d30] border border-[#37383b] focus:border-[#4573d2] rounded-lg flex items-center justify-between text-white text-[13px] transition-colors cursor-pointer"
+                        onClick={() => setIsXAxisOpen((v) => !v)}
+                        className="w-full h-10 px-3 bg-[#252628] hover:bg-[#2c2d30] border border-[#37383b] rounded-lg flex items-center justify-between text-white text-[13px] cursor-pointer"
+                      >
+                        <span>{currentChart.xAxis || 'Section'}</span>
+                        <ChevronDown className="w-4 h-4 text-[#8a8886]" />
+                      </button>
+                      {isXAxisOpen && (
+                        <div className="absolute top-11 left-0 right-0 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px]">
+                          {X_AXIS_OPTIONS.map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => {
+                                setCurrentChart((prev) => (prev ? { ...prev, xAxis: opt } : null));
+                                setIsXAxisOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-[#2f3135] text-white flex items-center justify-between cursor-pointer"
+                            >
+                              <span>{opt}</span>
+                              {currentChart.xAxis === opt && <Check className="w-3.5 h-3.5 text-white" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* DONUT: Group */}
+                {currentChart.type === 'donut' && (
+                  <div className="mb-3">
+                    <label className="text-[11px] text-[#8a8886] font-medium block mb-1.5">
+                      Group
+                    </label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsXAxisOpen((v) => !v)}
+                        className="w-full h-10 px-3 bg-[#252628] hover:bg-[#2c2d30] border border-[#37383b] rounded-lg flex items-center justify-between text-white text-[13px] cursor-pointer"
+                      >
+                        <span>{currentChart.xAxis || 'Section'}</span>
+                        <ChevronDown className="w-4 h-4 text-[#8a8886]" />
+                      </button>
+                      {isXAxisOpen && (
+                        <div className="absolute top-11 left-0 right-0 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px]">
+                          {X_AXIS_OPTIONS.map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => {
+                                setCurrentChart((prev) => (prev ? { ...prev, xAxis: opt } : null));
+                                setIsXAxisOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-[#2f3135] text-white flex items-center justify-between cursor-pointer"
+                            >
+                              <span>{opt}</span>
+                              {currentChart.xAxis === opt && <Check className="w-3.5 h-3.5 text-white" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* BURNUP / BURNDOWN: Day, Within the last, 2 Weeks */}
+                {(currentChart.type === 'burnup' || currentChart.type === 'burndown') && (
+                  <div className="space-y-2 mb-3">
+                    <label className="text-[11px] text-[#8a8886] font-medium block">
+                      X-axis
+                    </label>
+                    <select
+                      value={currentChart.timeGranularity || 'Day'}
+                      onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, timeGranularity: e.target.value as any } : null))}
+                      className="w-full h-10 px-3 bg-[#252628] border border-[#37383b] rounded-lg text-white text-[13px] outline-none"
+                    >
+                      <option value="Day">Day</option>
+                      <option value="Week">Week</option>
+                      <option value="Month">Month</option>
+                    </select>
+                    <select
+                      value="Within the last"
+                      disabled
+                      className="w-full h-10 px-3 bg-[#252628] border border-[#37383b] rounded-lg text-white text-[13px] outline-none"
+                    >
+                      <option value="Within the last">Within the last</option>
+                    </select>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={currentChart.timeDurationValue || 2}
+                        onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, timeDurationValue: parseInt(e.target.value) || 2 } : null))}
+                        className="h-10 px-3 bg-[#252628] border border-[#37383b] rounded-lg text-white text-[13px] outline-none"
+                      />
+                      <select
+                        value={currentChart.timeDurationUnit || 'Weeks'}
+                        onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, timeDurationUnit: e.target.value as any } : null))}
+                        className="h-10 px-3 bg-[#252628] border border-[#37383b] rounded-lg text-white text-[13px] outline-none"
+                      >
+                        <option value="Days">Days</option>
+                        <option value="Weeks">Weeks</option>
+                        <option value="Months">Months</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Y-axis / Value / Measure */}
+                <div className="mb-3">
+                  <label className="text-[11px] text-[#8a8886] font-medium block mb-1.5">
+                    {currentChart.type === 'donut' ? 'Measure' : currentChart.type === 'number' ? 'Value' : 'Y-axis'}
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsValueDropdownOpen((v) => !v)}
+                        className="w-full h-10 px-3 bg-[#252628] hover:bg-[#2c2d30] border border-[#37383b] rounded-lg flex items-center justify-between text-white text-[13px] cursor-pointer"
                       >
                         <span>{currentChart.valueType || 'Task'}</span>
                         <ChevronDown className="w-4 h-4 text-[#8a8886]" />
                       </button>
 
                       {isValueDropdownOpen && (
-                        <div className="absolute top-11 left-0 w-44 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 overflow-hidden text-[13px]">
+                        <div className="absolute top-11 left-0 w-44 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px]">
                           <button
                             type="button"
                             onClick={() => {
@@ -399,19 +1042,18 @@ export default function EditChartModal({
                       )}
                     </div>
 
-                    {/* Count dropdown */}
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => setIsCountDropdownOpen((prev) => !prev)}
-                        className="w-full h-10 px-3 bg-[#252628] hover:bg-[#2c2d30] border border-[#37383b] focus:border-[#4573d2] rounded-lg flex items-center justify-between text-white text-[13px] transition-colors cursor-pointer"
+                        onClick={() => setIsCountDropdownOpen((v) => !v)}
+                        className="w-full h-10 px-3 bg-[#252628] hover:bg-[#2c2d30] border border-[#37383b] rounded-lg flex items-center justify-between text-white text-[13px] cursor-pointer"
                       >
                         <span>{currentChart.aggregation || 'Count'}</span>
                         <ChevronDown className="w-4 h-4 text-[#8a8886]" />
                       </button>
 
                       {isCountDropdownOpen && (
-                        <div className="absolute top-11 left-0 w-32 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 overflow-hidden text-[13px]">
+                        <div className="absolute top-11 left-0 w-32 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px]">
                           {['Count', 'Sum', 'Average'].map((agg) => (
                             <button
                               key={agg}
@@ -432,47 +1074,62 @@ export default function EditChartModal({
                   </div>
                 </div>
 
-                {/* Filters Stack List */}
-                <div className="mt-4 space-y-2">
-                  <label className="text-[11px] text-[#8a8886] font-medium block">
+                {/* Show as percentage toggle */}
+                {(currentChart.type === 'stacked_bar' || currentChart.type === 'donut') && (
+                  <label className="flex items-center gap-2 text-[12.5px] text-[#cfcecd] cursor-pointer py-1">
+                    <input
+                      type="checkbox"
+                      checked={!!currentChart.showAsPercentage}
+                      onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, showAsPercentage: e.target.checked } : null))}
+                      className="rounded border-[#37383b] bg-[#252628] text-[#4573d2] focus:ring-0"
+                    />
+                    <span>Show as percentage</span>
+                  </label>
+                )}
+
+                {/* Filters */}
+                <div className="mt-4 pt-3 border-t border-[#2b2c2e]">
+                  <label className="text-[11px] text-[#8a8886] font-medium block mb-2">
                     Filters
                   </label>
 
-                  {currentChart.filters.map((f) => (
-                    <div
-                      key={f.id}
-                      className="flex items-center justify-between px-3 py-2 bg-[#252628] border border-[#37383b] rounded-lg text-[13px] text-white"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-3.5 h-3.5 rounded-full border border-[#8a8886] flex items-center justify-center">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#4573d2]" />
-                        </span>
-                        <span>{f.label}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFilter(f.id)}
-                        className="p-1 text-[#8a8886] hover:text-white rounded transition-colors cursor-pointer"
-                        title="Remove filter"
+                  <div className="space-y-1.5">
+                    {currentChart.filters.map((f) => (
+                      <div
+                        key={f.id}
+                        className="flex items-center justify-between px-3 py-2 bg-[#252628] border border-[#37383b] rounded-lg text-[13px] text-white"
                       >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-2">
+                          <span className="w-3.5 h-3.5 rounded-full border border-[#8a8886] flex items-center justify-center">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#4573d2]" />
+                          </span>
+                          <span>{f.label}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFilter(f.id)}
+                          className="p-1 text-[#8a8886] hover:text-white rounded transition-colors cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
 
-                  {/* + Add Filter Dropdown */}
-                  <div className="relative pt-1">
+                  {/* + Add filter button */}
+                  <div className="relative pt-2">
                     <button
                       type="button"
-                      onClick={() => setIsAddFilterOpen((prev) => !prev)}
+                      onClick={() => setIsAddFilterOpen((v) => !v)}
                       className="flex items-center gap-1.5 text-[12.5px] text-[#4573d2] hover:text-[#6a98f0] font-medium cursor-pointer"
                     >
-                      <span>+ Add filter</span>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add filter</span>
                       <ChevronDown className="w-3.5 h-3.5" />
                     </button>
 
                     {isAddFilterOpen && (
-                      <div className="absolute top-8 left-0 w-52 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 overflow-hidden text-[13px]">
+                      <div className="absolute top-9 left-0 w-52 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px]">
                         <button
                           type="button"
                           onClick={() => handleAddFilter('completion', 'Incomplete', 'incomplete')}
@@ -505,10 +1162,39 @@ export default function EditChartModal({
                     )}
                   </div>
                 </div>
+
+                {/* Data annotations */}
+                {currentChart.type !== 'number' && (
+                  <div className="mt-4 pt-3 border-t border-[#2b2c2e] space-y-2">
+                    <label className="text-[11px] text-[#8a8886] font-medium block mb-1">
+                      Data annotations
+                    </label>
+                    <label className="flex items-center gap-2 text-[12.5px] text-[#cfcecd] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={currentChart.dataLabels !== false}
+                        onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, dataLabels: e.target.checked } : null))}
+                        className="rounded border-[#37383b] bg-[#252628] text-[#4573d2] focus:ring-0"
+                      />
+                      <span>Data labels</span>
+                    </label>
+                    {currentChart.type !== 'donut' && (
+                      <label className="flex items-center gap-2 text-[12.5px] text-[#cfcecd] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!currentChart.benchmarkLine}
+                          onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, benchmarkLine: e.target.checked } : null))}
+                          className="rounded border-[#37383b] bg-[#252628] text-[#4573d2] focus:ring-0"
+                        />
+                        <span>Benchmark line</span>
+                      </label>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Bottom Actions: Cancel & Save chart */}
+            {/* Bottom Actions */}
             <div className="pt-4 border-t border-[#2b2c2e] flex items-center justify-end gap-2.5">
               <button
                 type="button"
@@ -522,7 +1208,7 @@ export default function EditChartModal({
                 onClick={handleSave}
                 className="px-4 py-1.5 rounded-lg bg-[#4573d2] hover:bg-[#3562be] text-white text-[13px] font-medium transition-colors cursor-pointer shadow-sm"
               >
-                Save chart
+                {isNew ? 'Add chart' : 'Save chart'}
               </button>
             </div>
           </div>

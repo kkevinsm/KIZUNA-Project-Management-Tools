@@ -25,6 +25,7 @@ const DEFAULT_WIDGETS: ChartConfig[] = [
     id: 'w-completed',
     title: 'Total completed tasks',
     type: 'number',
+    color: '#a8a5f8',
     size: 'kpi',
     filterCountText: '1 Filter',
     filters: [{ id: 'f1', field: 'completion', label: 'Completed', value: 'completed' }],
@@ -35,6 +36,7 @@ const DEFAULT_WIDGETS: ChartConfig[] = [
     id: 'w-incomplete',
     title: 'Total incomplete tasks',
     type: 'number',
+    color: '#a8a5f8',
     size: 'kpi',
     filterCountText: '1 Filter',
     filters: [{ id: 'f2', field: 'completion', label: 'Incomplete', value: 'incomplete' }],
@@ -45,6 +47,7 @@ const DEFAULT_WIDGETS: ChartConfig[] = [
     id: 'w-overdue',
     title: 'Total overdue tasks',
     type: 'number',
+    color: '#a8a5f8',
     size: 'kpi',
     filterCountText: '1 Filter',
     filters: [{ id: 'f3', field: 'dueDate', label: 'Overdue', value: 'overdue' }],
@@ -55,6 +58,7 @@ const DEFAULT_WIDGETS: ChartConfig[] = [
     id: 'w-total',
     title: 'Total tasks',
     type: 'number',
+    color: '#a8a5f8',
     size: 'kpi',
     filterCountText: 'No Filters',
     filters: [],
@@ -66,6 +70,7 @@ const DEFAULT_WIDGETS: ChartConfig[] = [
     id: 'w-section',
     title: 'Total tasks by section',
     type: 'bar',
+    color: '#a8a5f8',
     size: 'large',
     filterCountText: '1 Filter',
     filters: [{ id: 'f4', field: 'completion', label: 'Incomplete', value: 'incomplete' }],
@@ -76,6 +81,7 @@ const DEFAULT_WIDGETS: ChartConfig[] = [
     id: 'w-status-donut',
     title: 'Tasks by completion status this upcoming month',
     type: 'donut',
+    color: '#a8a5f8',
     size: 'large',
     filterCountText: '2 Filters',
     filters: [
@@ -90,6 +96,7 @@ const DEFAULT_WIDGETS: ChartConfig[] = [
     id: 'w-project-lollipop',
     title: 'Total tasks by project',
     type: 'lollipop',
+    color: '#a8a5f8',
     size: 'large',
     filterCountText: '1 Filter',
     filters: [{ id: 'f7', field: 'completion', label: 'Incomplete', value: 'incomplete' }],
@@ -100,6 +107,7 @@ const DEFAULT_WIDGETS: ChartConfig[] = [
     id: 'w-completion-time',
     title: 'Task completion over time',
     type: 'line',
+    color: '#a8a5f8',
     size: 'large',
     filterCountText: '2 Filters',
     filters: [
@@ -127,6 +135,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
 
   const [editingWidget, setEditingWidget] = useState<ChartConfig | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isNewWidget, setIsNewWidget] = useState(false);
   const [hoveredWidgetId, setHoveredWidgetId] = useState<string | null>(null);
 
   const sections = ['Recently assigned', 'Do today', 'Do next week', 'Do later'];
@@ -145,6 +154,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
 
   const handleOpenEdit = (widget: ChartConfig) => {
     setEditingWidget(widget);
+    setIsNewWidget(false);
     setIsEditModalOpen(true);
   };
 
@@ -153,13 +163,17 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
       id: `w-custom-${Date.now()}`,
       title: 'New chart',
       type: 'bar',
+      color: '#a8a5f8',
       size: 'large',
       filterCountText: '1 Filter',
       filters: [{ id: `f-${Date.now()}`, field: 'completion', label: 'Incomplete', value: 'incomplete' }],
       valueType: 'Task',
       aggregation: 'Count',
+      dataLabels: true,
+      benchmarkLine: false,
     };
     setEditingWidget(newWidget);
+    setIsNewWidget(true);
     setIsEditModalOpen(true);
   };
 
@@ -330,31 +344,24 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                   {/* 1. Bar Chart: Total tasks by section */}
                   {w.type === 'bar' && (
                     <div className="w-full h-[180px] flex items-center">
-                      {/* Y-axis label */}
                       <div className="h-full flex items-center justify-center pr-2">
                         <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
                           Task count
                         </span>
                       </div>
 
-                      {/* Main Chart Area */}
                       <div className="flex-1 h-full flex flex-col justify-between">
-                        {/* Grid lines with Y markers (4, 2, 0) */}
                         <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
-                          {/* 4 */}
                           <div className="w-full border-b border-[#323438] relative flex items-center">
                             <span className="absolute -left-4 text-[9px] text-[#8a8886]">4</span>
                           </div>
-                          {/* 2 */}
                           <div className="w-full border-b border-[#323438] relative flex items-center">
                             <span className="absolute -left-4 text-[9px] text-[#8a8886]">2</span>
                           </div>
-                          {/* 0 */}
                           <div className="w-full relative flex items-center">
                             <span className="absolute -left-4 text-[9px] text-[#8a8886]">0</span>
                           </div>
 
-                          {/* Bars columns */}
                           <div className="absolute inset-0 flex items-end justify-around px-4">
                             {sections.map((sec, idx) => {
                               const count = idx === 0 ? 3 : 0;
@@ -363,8 +370,8 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                                 <div key={sec} className="flex flex-col items-center justify-end h-full w-12">
                                   <span className="text-[11px] font-bold text-white mb-1">{count}</span>
                                   <div
-                                    className="w-8 bg-[#a8a5f8] rounded-t-xs transition-all duration-300"
-                                    style={{ height: `${heightPct}%` }}
+                                    className="w-8 rounded-t-xs transition-all duration-300"
+                                    style={{ height: `${heightPct}%`, backgroundColor: w.color || '#a8a5f8' }}
                                   />
                                 </div>
                               );
@@ -372,7 +379,6 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                           </div>
                         </div>
 
-                        {/* X-axis labels rotated like Asana screenshot */}
                         <div className="flex justify-around pt-3 text-[10px] text-[#8a8886]">
                           {sections.map((sec) => (
                             <span
@@ -382,6 +388,133 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                               {sec}
                             </span>
                           ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 1.1 Stacked Bar */}
+                  {w.type === 'stacked_bar' && (
+                    <div className="w-full h-[180px] flex items-center">
+                      <div className="h-full flex items-center justify-center pr-2">
+                        <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
+                          Task count
+                        </span>
+                      </div>
+                      <div className="flex-1 h-full flex flex-col justify-between">
+                        <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
+                          {[4, 2, 0].map((v) => (
+                            <div key={v} className="w-full border-b border-[#323438] relative flex items-center">
+                              <span className="absolute -left-4 text-[9px] text-[#8a8886]">{v}</span>
+                            </div>
+                          ))}
+                          <div className="absolute inset-0 flex items-end justify-around px-4">
+                            <div className="flex flex-col items-center justify-end h-full w-12">
+                              <span className="text-[11px] font-bold text-white mb-0.5">3</span>
+                              <div className="w-8 rounded-t-xs overflow-hidden flex flex-col justify-end" style={{ height: '75%' }}>
+                                <div className="bg-[#bfe764] h-[33%] w-full flex items-center justify-center text-[9px] font-bold text-black">1</div>
+                                <div className="bg-[#a8a5f8] h-[67%] w-full flex items-center justify-center text-[9px] font-bold text-black">2</div>
+                              </div>
+                            </div>
+                            {sections.slice(1).map((sec) => (
+                              <div key={sec} className="flex flex-col items-center justify-end h-full w-12">
+                                <span className="text-[11px] font-bold text-white mb-0.5">0</span>
+                                <div className="w-8 h-0.5 bg-[#3e4044]" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex justify-around pt-3 text-[10px] text-[#8a8886]">
+                          {sections.map((sec) => (
+                            <span key={sec} className="truncate max-w-[70px] -rotate-30 origin-top-left transform translate-y-1">
+                              {sec}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="ml-4 space-y-1.5 text-[10px] text-[#cfcecd]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-xs bg-[#75ebd6]" />
+                          <span>Unscheduled</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-xs bg-[#f79bb7]" />
+                          <span>Completed</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-xs bg-[#bfe764]" />
+                          <span>Overdue</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-xs bg-[#a8a5f8]" />
+                          <span>Upcoming</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 1.2 Grouped Bar */}
+                  {w.type === 'grouped_bar' && (
+                    <div className="w-full h-[180px] flex items-center">
+                      <div className="h-full flex items-center justify-center pr-2">
+                        <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
+                          Task count
+                        </span>
+                      </div>
+                      <div className="flex-1 h-full flex flex-col justify-between">
+                        <div className="relative flex-1 flex flex-col justify-between border-l border-b border-[#3e4044]">
+                          {[4, 2, 0].map((v) => (
+                            <div key={v} className="w-full border-b border-[#323438] relative flex items-center">
+                              <span className="absolute -left-4 text-[9px] text-[#8a8886]">{v}</span>
+                            </div>
+                          ))}
+                          <div className="absolute inset-0 flex items-end justify-around px-4">
+                            <div className="flex items-end gap-1 h-full">
+                              <div className="flex flex-col items-center justify-end h-full">
+                                <span className="text-[10px] font-bold text-white mb-0.5">2</span>
+                                <div className="w-6 h-[50%] bg-[#a8a5f8] rounded-t-xs" />
+                              </div>
+                              <div className="flex flex-col items-center justify-end h-full">
+                                <span className="text-[10px] font-bold text-white mb-0.5">1</span>
+                                <div className="w-6 h-[25%] bg-[#bfe764] rounded-t-xs" />
+                              </div>
+                            </div>
+                            <div className="flex items-end gap-1 h-full">
+                              <div className="flex flex-col items-center justify-end h-full">
+                                <span className="text-[10px] font-bold text-white mb-0.5">0</span>
+                                <div className="w-6 h-0.5 bg-[#3e4044]" />
+                              </div>
+                              <div className="flex flex-col items-center justify-end h-full">
+                                <span className="text-[10px] font-bold text-white mb-0.5">0</span>
+                                <div className="w-6 h-0.5 bg-[#3e4044]" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex justify-around pt-3 text-[10px] text-[#8a8886]">
+                          {sections.slice(0, 2).map((sec) => (
+                            <span key={sec} className="truncate max-w-[70px] -rotate-30 origin-top-left transform translate-y-1">
+                              {sec}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="ml-4 space-y-1.5 text-[10px] text-[#cfcecd]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-xs bg-[#a8a5f8]" />
+                          <span>Upcoming</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-xs bg-[#bfe764]" />
+                          <span>Overdue</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-xs bg-[#f79bb7]" />
+                          <span>Completed</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-xs bg-[#75ebd6]" />
+                          <span>Unscheduled</span>
                         </div>
                       </div>
                     </div>
@@ -597,6 +730,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
           tasks={tasks}
           sections={sections}
           projects={projects}
+          isNew={isNewWidget}
         />
       )}
     </div>
