@@ -35,6 +35,7 @@ export interface ChartConfig {
   filters: ChartFilter[];
   valueType: string;
   aggregation: string;
+  unitOfTime?: 'Default' | 'Minutes' | 'Hours' | 'Days' | 'Weeks' | 'Months' | 'Years';
   size: 'kpi' | 'large';
   colSpan?: 1 | 2;
   textContent?: string;
@@ -87,6 +88,7 @@ const X_AXIS_OPTIONS = [
   'Completion status',
   'Due date status',
   'Project',
+  'Custom field',
 ];
 
 const GROUP_BY_OPTIONS = [
@@ -95,7 +97,55 @@ const GROUP_BY_OPTIONS = [
   'Priority',
   'Task type',
   'Section',
+  'Assignee',
 ];
+
+// Helper to compute Asana dynamic title based on configuration
+export const computeChartTitle = (chart: ChartConfig): string => {
+  let metric = 'tasks';
+  if (chart.valueType === 'Estimated time') {
+    metric = 'estimated time';
+  } else if (chart.valueType === 'Actual time') {
+    metric = 'actual time';
+  } else {
+    const completionFilter = chart.filters.find((f) => f.field === 'completion');
+    if (completionFilter?.value === 'completed') {
+      metric = 'completed tasks';
+    } else if (completionFilter?.value === 'incomplete') {
+      metric = 'incomplete tasks';
+    } else {
+      const overdueFilter = chart.filters.find((f) => f.field === 'dueDate' && f.value === 'overdue');
+      if (overdueFilter) {
+        metric = 'overdue tasks';
+      }
+    }
+  }
+
+  if (chart.type === 'number') {
+    return `Total ${metric}`;
+  }
+  if (chart.type === 'burndown') {
+    return 'Tasks remaining over time';
+  }
+  if (chart.type === 'burnup') {
+    return 'Task completion over time';
+  }
+  if (chart.type === 'line' && chart.xAxis === 'Time') {
+    return 'Task completion over time';
+  }
+
+  const dim = (chart.type === 'donut' ? chart.xAxis : chart.xAxis) || 'Section';
+  const dimLabel = dim === 'Due date status' ? 'task due date status' : dim.toLowerCase();
+
+  let title = `Total ${metric} by ${dimLabel}`;
+
+  if ((chart.type === 'stacked_bar' || chart.type === 'grouped_bar') && chart.groupBy) {
+    const groupLabel = chart.groupBy === 'Due date status' ? 'task due date status' : chart.groupBy.toLowerCase();
+    title += ` and ${groupLabel}`;
+  }
+
+  return title;
+};
 
 interface EditChartModalProps {
   isOpen: boolean;
@@ -125,8 +175,10 @@ export default function EditChartModal({
   const [isGroupByOpen, setIsGroupByOpen] = useState(false);
   const [isValueDropdownOpen, setIsValueDropdownOpen] = useState(false);
   const [isCountDropdownOpen, setIsCountDropdownOpen] = useState(false);
+  const [isUnitOfTimeOpen, setIsUnitOfTimeOpen] = useState(false);
   const [isAddFilterOpen, setIsAddFilterOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isUserEditedTitle, setIsUserEditedTitle] = useState(false);
 
   useEffect(() => {
     if (chart) {
@@ -135,6 +187,9 @@ export default function EditChartModal({
         color: chart.color || '#a8a5f8',
         xAxis: chart.xAxis || 'Section',
         groupBy: chart.groupBy || 'Due date status',
+        valueType: chart.valueType || 'Task',
+        aggregation: chart.aggregation || 'Count',
+        unitOfTime: chart.unitOfTime || 'Default',
         dataLabels: chart.dataLabels !== false,
         benchmarkLine: !!chart.benchmarkLine,
         showAsPercentage: !!chart.showAsPercentage,
@@ -143,6 +198,7 @@ export default function EditChartModal({
         timeDurationUnit: chart.timeDurationUnit || 'Weeks',
         filters: [...chart.filters],
       });
+      setIsUserEditedTitle(false);
     }
   }, [chart]);
 
@@ -151,6 +207,18 @@ export default function EditChartModal({
   const activeStyle = CHART_STYLES.find((s) => s.id === currentChart.type) || CHART_STYLES[0];
   const ActiveIcon = activeStyle.icon;
   const chartColor = currentChart.color || '#a8a5f8';
+
+  // Helper to update setting and auto-update title if not manually customized
+  const updateChartConfig = (patch: Partial<ChartConfig>) => {
+    setCurrentChart((prev) => {
+      if (!prev) return null;
+      const updated: ChartConfig = { ...prev, ...patch };
+      if (!isUserEditedTitle) {
+        updated.title = computeChartTitle(updated);
+      }
+      return updated;
+    });
+  };
 
   // Compute metric for preview
   const computeValue = () => {
@@ -173,33 +241,9 @@ export default function EditChartModal({
   };
 
   const handleSelectStyle = (type: ChartConfig['type']) => {
-    setCurrentChart((prev) => {
-      if (!prev) return null;
-      let newTitle = prev.title;
-      if (type === 'stacked_bar' || type === 'grouped_bar') {
-        newTitle = 'Total tasks by section and task due date status';
-      } else if (type === 'burnup') {
-        newTitle = 'Task completion over time';
-      } else if (type === 'burndown') {
-        newTitle = 'Tasks remaining over time';
-      } else if (type === 'donut') {
-        newTitle = 'Total tasks by section';
-      } else if (type === 'number') {
-        newTitle = 'Total tasks';
-      } else if (type === 'lollipop') {
-        newTitle = 'Total tasks by section';
-      } else if (type === 'line') {
-        newTitle = 'Total tasks by section';
-      } else if (type === 'bar') {
-        newTitle = 'Total tasks by section';
-      }
-
-      return {
-        ...prev,
-        type,
-        title: newTitle,
-        size: type === 'number' ? 'kpi' : 'large',
-      };
+    updateChartConfig({
+      type,
+      size: type === 'number' ? 'kpi' : 'large',
     });
     setIsStyleDropdownOpen(false);
   };
@@ -207,9 +251,13 @@ export default function EditChartModal({
   const handleRemoveFilter = (filterId: string) => {
     setCurrentChart((prev) => {
       if (!prev) return null;
-      const updated = prev.filters.filter((f) => f.id !== filterId);
-      const text = updated.length === 0 ? 'No Filters' : `${updated.length} Filter${updated.length > 1 ? 's' : ''}`;
-      return { ...prev, filters: updated, filterCountText: text };
+      const updatedFilters = prev.filters.filter((f) => f.id !== filterId);
+      const text = updatedFilters.length === 0 ? 'No Filters' : `${updatedFilters.length} Filter${updatedFilters.length > 1 ? 's' : ''}`;
+      const nextChart: ChartConfig = { ...prev, filters: updatedFilters, filterCountText: text };
+      if (!isUserEditedTitle) {
+        nextChart.title = computeChartTitle(nextChart);
+      }
+      return nextChart;
     });
   };
 
@@ -222,9 +270,13 @@ export default function EditChartModal({
         label,
         value,
       };
-      const updated = [...prev.filters, newFilter];
-      const text = `${updated.length} Filter${updated.length > 1 ? 's' : ''}`;
-      return { ...prev, filters: updated, filterCountText: text };
+      const updatedFilters = [...prev.filters, newFilter];
+      const text = `${updatedFilters.length} Filter${updatedFilters.length > 1 ? 's' : ''}`;
+      const nextChart: ChartConfig = { ...prev, filters: updatedFilters, filterCountText: text };
+      if (!isUserEditedTitle) {
+        nextChart.title = computeChartTitle(nextChart);
+      }
+      return nextChart;
     });
     setIsAddFilterOpen(false);
   };
@@ -237,6 +289,9 @@ export default function EditChartModal({
   };
 
   const calculatedNumber = computeValue();
+  const yAxisLabel = currentChart.valueType === 'Estimated time' || currentChart.valueType === 'Actual time'
+    ? 'Estimated time (in minutes)'
+    : 'Task count';
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-6 select-none animate-in fade-in duration-150">
@@ -259,14 +314,14 @@ export default function EditChartModal({
               type="button"
               onClick={onClose}
               className="p-1.5 rounded-md text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors cursor-pointer"
-              title="Close"
+              title="Close modal"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Modal Body */}
+        {/* Modal Main Body: 2 Columns */}
         <div className="flex-1 flex overflow-hidden">
           {/* Left Pane: Live Chart Preview */}
           <div className="flex-1 bg-[#17181a] p-8 flex flex-col justify-between relative overflow-hidden">
@@ -275,7 +330,10 @@ export default function EditChartModal({
               <input
                 type="text"
                 value={currentChart.title}
-                onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, title: e.target.value } : null))}
+                onChange={(e) => {
+                  setIsUserEditedTitle(true);
+                  setCurrentChart((prev) => (prev ? { ...prev, title: e.target.value } : null));
+                }}
                 className="text-[18px] font-semibold text-white bg-transparent border-b border-transparent hover:border-[#37383b] focus:border-[#4573d2] outline-none px-1 py-0.5 rounded transition-colors w-full"
                 title="Click to edit title"
               />
@@ -287,7 +345,7 @@ export default function EditChartModal({
               {currentChart.type === 'number' && (
                 <div className="flex flex-col items-center">
                   <span className="text-[88px] font-light text-white tracking-tight leading-none">
-                    {calculatedNumber || 3}
+                    {calculatedNumber}
                   </span>
                 </div>
               )}
@@ -297,7 +355,7 @@ export default function EditChartModal({
                 <div className="w-full max-w-lg h-[240px] flex items-center">
                   <div className="h-full flex items-center justify-center pr-3">
                     <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
-                      Task count
+                      {yAxisLabel}
                     </span>
                   </div>
                   <div className="flex-1 h-full flex flex-col justify-between">
@@ -341,12 +399,12 @@ export default function EditChartModal({
                 </div>
               )}
 
-              {/* 3. STACKED BAR (Image 2) */}
+              {/* 3. STACKED BAR */}
               {currentChart.type === 'stacked_bar' && (
                 <div className="w-full max-w-lg h-[240px] flex items-center">
                   <div className="h-full flex items-center justify-center pr-3">
                     <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
-                      Task count
+                      {yAxisLabel}
                     </span>
                   </div>
                   <div className="flex-1 h-full flex flex-col justify-between">
@@ -357,17 +415,14 @@ export default function EditChartModal({
                         </div>
                       ))}
                       <div className="absolute inset-0 flex items-end justify-around px-4">
-                        {/* Recently assigned stacked bar */}
                         <div className="flex flex-col items-center justify-end h-full w-12">
                           {currentChart.dataLabels && (
                             <span className="text-[11px] font-bold text-white mb-1">3</span>
                           )}
                           <div className="w-9 rounded-t-xs overflow-hidden flex flex-col justify-end" style={{ height: '60%' }}>
-                            {/* Overdue (top part: 1) */}
                             <div className="bg-[#bfe764] h-[33%] w-full flex items-center justify-center text-[10px] font-bold text-black">
                               {currentChart.dataLabels && '1'}
                             </div>
-                            {/* Upcoming (bottom part: 2) */}
                             <div className="bg-[#a8a5f8] h-[67%] w-full flex items-center justify-center text-[10px] font-bold text-black">
                               {currentChart.dataLabels && '2'}
                             </div>
@@ -392,7 +447,6 @@ export default function EditChartModal({
                       ))}
                     </div>
                   </div>
-                  {/* Legend on right */}
                   <div className="ml-6 space-y-2 text-[11px] text-[#cfcecd]">
                     <div className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-xs bg-[#75ebd6]" />
@@ -414,12 +468,12 @@ export default function EditChartModal({
                 </div>
               )}
 
-              {/* 4. GROUPED BAR (Image 3) */}
+              {/* 4. GROUPED BAR */}
               {currentChart.type === 'grouped_bar' && (
                 <div className="w-full max-w-lg h-[240px] flex items-center">
                   <div className="h-full flex items-center justify-center pr-3">
                     <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
-                      Task count
+                      {yAxisLabel}
                     </span>
                   </div>
                   <div className="flex-1 h-full flex flex-col justify-between">
@@ -430,7 +484,6 @@ export default function EditChartModal({
                         </div>
                       ))}
                       <div className="absolute inset-0 flex items-end justify-around px-4">
-                        {/* Recently assigned has 2 side-by-side bars */}
                         <div className="flex items-end gap-1 h-full">
                           <div className="flex flex-col items-center justify-end h-full">
                             {currentChart.dataLabels && <span className="text-[10px] font-bold text-white mb-0.5">2</span>}
@@ -457,11 +510,22 @@ export default function EditChartModal({
                       </div>
                     </div>
                     <div className="flex justify-around pt-3 text-[10px] text-[#8a8886]">
-                      {sections.slice(0, 2).map((sec) => (
-                        <span key={sec} className="truncate max-w-[80px] -rotate-35 origin-top-left transform translate-y-1">
-                          {sec}
-                        </span>
-                      ))}
+                      {currentChart.xAxis === 'Completion status' ? (
+                        <>
+                          <span className="truncate max-w-[80px] -rotate-35 origin-top-left transform translate-y-1">
+                            Incomplete
+                          </span>
+                          <span className="truncate max-w-[80px] -rotate-35 origin-top-left transform translate-y-1">
+                            Completed
+                          </span>
+                        </>
+                      ) : (
+                        sections.slice(0, 2).map((sec) => (
+                          <span key={sec} className="truncate max-w-[80px] -rotate-35 origin-top-left transform translate-y-1">
+                            {sec}
+                          </span>
+                        ))
+                      )}
                     </div>
                   </div>
                   <div className="ml-6 space-y-2 text-[11px] text-[#cfcecd]">
@@ -485,12 +549,12 @@ export default function EditChartModal({
                 </div>
               )}
 
-              {/* 5. LINE (Image 4) */}
+              {/* 5. LINE */}
               {currentChart.type === 'line' && (
                 <div className="w-full max-w-lg h-[240px] flex items-center">
                   <div className="h-full flex items-center justify-center pr-3">
                     <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
-                      Task count
+                      {yAxisLabel}
                     </span>
                   </div>
                   <div className="flex-1 h-full flex flex-col justify-between">
@@ -508,7 +572,6 @@ export default function EditChartModal({
                             stroke={chartColor}
                             strokeWidth="2"
                           />
-                          {/* Points */}
                           <circle cx="37" cy="48" r="3.5" fill={chartColor} />
                           <circle cx="112" cy="120" r="3.5" fill={chartColor} />
                           <circle cx="187" cy="120" r="3.5" fill={chartColor} />
@@ -535,12 +598,12 @@ export default function EditChartModal({
                 </div>
               )}
 
-              {/* 6. BURNUP & BURNDOWN (Image 5 & Batch 2 Image 1) */}
+              {/* 6. BURNUP & BURNDOWN */}
               {(currentChart.type === 'burnup' || currentChart.type === 'burndown') && (
                 <div className="w-full max-w-lg h-[240px] flex items-center">
                   <div className="h-full flex items-center justify-center pr-3">
                     <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
-                      Task count
+                      {yAxisLabel}
                     </span>
                   </div>
                   <div className="flex-1 h-full flex flex-col justify-between">
@@ -555,31 +618,59 @@ export default function EditChartModal({
                           <defs>
                             <linearGradient id="burnGrad" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor={chartColor} stopOpacity="0.8" />
-                              <stop offset="100%" stopColor={chartColor} stopOpacity="0.8" />
+                              <stop offset="100%" stopColor={chartColor} stopOpacity="0.2" />
                             </linearGradient>
                           </defs>
-                          <path
-                            d="M 10 120 L 45 120 L 80 120 L 115 120 L 150 120 L 185 120 L 220 120 L 255 120 L 275 80 L 295 48 L 295 120 Z"
-                            fill="url(#burnGrad)"
-                          />
-                          <path
-                            d="M 10 120 L 45 120 L 80 120 L 115 120 L 150 120 L 185 120 L 220 120 L 255 120 L 275 80 L 295 48"
-                            fill="none"
-                            stroke="#ffffff"
-                            strokeWidth="2"
-                          />
-                          {currentChart.dataLabels && (
+                          {currentChart.type === 'burndown' ? (
+                            // Burndown area curve sloping down
                             <>
-                              <text x="10" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
-                              <text x="45" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
-                              <text x="80" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
-                              <text x="115" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
-                              <text x="150" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
-                              <text x="185" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
-                              <text x="220" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
-                              <text x="255" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
-                              <text x="275" y="70" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">2</text>
-                              <text x="295" y="40" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">3</text>
+                              <path
+                                d="M 10 30 L 45 40 L 80 50 L 115 55 L 150 70 L 185 85 L 220 95 L 255 105 L 290 120 L 310 120 L 310 120 L 10 120 Z"
+                                fill="url(#burnGrad)"
+                              />
+                              <path
+                                d="M 10 30 L 45 40 L 80 50 L 115 55 L 150 70 L 185 85 L 220 95 L 255 105 L 290 120 L 310 120"
+                                fill="none"
+                                stroke="#ffffff"
+                                strokeWidth="2"
+                              />
+                              {currentChart.dataLabels && (
+                                <>
+                                  <text x="10" y="22" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">5</text>
+                                  <text x="80" y="42" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">4</text>
+                                  <text x="150" y="62" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">3</text>
+                                  <text x="220" y="87" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">1</text>
+                                  <text x="290" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            // Burnup curve
+                            <>
+                              <path
+                                d="M 10 120 L 45 120 L 80 120 L 115 120 L 150 120 L 185 120 L 220 120 L 255 120 L 275 80 L 295 48 L 295 120 Z"
+                                fill="url(#burnGrad)"
+                              />
+                              <path
+                                d="M 10 120 L 45 120 L 80 120 L 115 120 L 150 120 L 185 120 L 220 120 L 255 120 L 275 80 L 295 48"
+                                fill="none"
+                                stroke="#ffffff"
+                                strokeWidth="2"
+                              />
+                              {currentChart.dataLabels && (
+                                <>
+                                  <text x="10" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                                  <text x="45" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                                  <text x="80" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                                  <text x="115" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                                  <text x="150" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                                  <text x="185" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                                  <text x="220" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                                  <text x="255" y="112" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">0</text>
+                                  <text x="275" y="70" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">2</text>
+                                  <text x="295" y="40" fill="#fff" fontSize="9" fontWeight="bold" textAnchor="middle">3</text>
+                                </>
+                              )}
                             </>
                           )}
                         </svg>
@@ -612,7 +703,7 @@ export default function EditChartModal({
                 </div>
               )}
 
-              {/* 7. DONUT (Batch 2 Image 2) */}
+              {/* 7. DONUT */}
               {currentChart.type === 'donut' && (
                 <div className="flex items-center justify-around w-full max-w-md">
                   <div className="relative w-48 h-48 flex items-center justify-center">
@@ -631,25 +722,41 @@ export default function EditChartModal({
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-[34px] font-bold text-white leading-none">3</span>
+                      <span className="text-[34px] font-bold text-white leading-none">
+                        {currentChart.valueType === 'Estimated time'
+                          ? currentChart.unitOfTime === 'Years'
+                            ? '0 yr'
+                            : currentChart.unitOfTime === 'Weeks'
+                            ? '0 wk'
+                            : currentChart.unitOfTime === 'Days'
+                            ? '0 d'
+                            : currentChart.unitOfTime === 'Hours'
+                            ? '0 hr'
+                            : '0 min'
+                          : calculatedNumber}
+                      </span>
                       {currentChart.dataLabels && (
-                        <span className="text-[11px] text-white/80 mt-10">3</span>
+                        <span className="text-[11px] text-white/80 mt-10">
+                          {currentChart.valueType === 'Estimated time' ? '0' : calculatedNumber}
+                        </span>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: chartColor }} />
-                    <span className="text-[13px] text-[#cfcecd]">Recently assigned</span>
+                    <span className="text-[13px] text-[#cfcecd]">
+                      {currentChart.xAxis === 'Assignee' ? 'Kevin' : 'Recently assigned'}
+                    </span>
                   </div>
                 </div>
               )}
 
-              {/* 8. LOLLIPOP (Batch 2 Image 4 & 5) */}
+              {/* 8. LOLLIPOP */}
               {currentChart.type === 'lollipop' && (
                 <div className="w-full max-w-lg h-[240px] flex items-center">
                   <div className="h-full flex items-center justify-center pr-3">
                     <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
-                      Task count
+                      {yAxisLabel}
                     </span>
                   </div>
                   <div className="flex-1 h-full flex flex-col justify-between">
@@ -686,11 +793,17 @@ export default function EditChartModal({
                       </div>
                     </div>
                     <div className="flex justify-around pt-3 text-[10px] text-[#8a8886]">
-                      {sections.map((sec) => (
-                        <span key={sec} className="truncate max-w-[70px] -rotate-35 origin-top-left transform translate-y-1">
-                          {sec}
+                      {currentChart.xAxis === 'Assignee' ? (
+                        <span className="truncate max-w-[70px] -rotate-35 origin-top-left transform translate-y-1">
+                          Kevin
                         </span>
-                      ))}
+                      ) : (
+                        sections.map((sec) => (
+                          <span key={sec} className="truncate max-w-[70px] -rotate-35 origin-top-left transform translate-y-1">
+                            {sec}
+                          </span>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -725,7 +838,7 @@ export default function EditChartModal({
                       <ChevronDown className="w-4 h-4 text-[#8a8886]" />
                     </button>
 
-                    {/* Chart Style Dropdown Menu matching Image 1 */}
+                    {/* Chart Style Dropdown Menu */}
                     {isStyleDropdownOpen && (
                       <div className="absolute top-11 left-0 right-0 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 overflow-visible animate-in fade-in zoom-in-95 duration-100">
                         {/* 1. Set color > with Palette Submenu */}
@@ -745,7 +858,7 @@ export default function EditChartModal({
                             <ChevronRight className="w-4 h-4 text-[#8a8886]" />
                           </button>
 
-                          {/* Color Palette Popover matching Image 1 */}
+                          {/* Color Palette Popover */}
                           {isColorPickerOpen && (
                             <div className="absolute left-full top-0 ml-1.5 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl p-2.5 w-56 animate-in fade-in duration-100">
                               <div className="grid grid-cols-8 gap-1.5">
@@ -756,7 +869,7 @@ export default function EditChartModal({
                                       key={col.id}
                                       type="button"
                                       onClick={() => {
-                                        setCurrentChart((prev) => (prev ? { ...prev, color: col.value } : null));
+                                        updateChartConfig({ color: col.value });
                                         setIsColorPickerOpen(false);
                                         setIsStyleDropdownOpen(false);
                                       }}
@@ -806,8 +919,6 @@ export default function EditChartModal({
               <div>
                 <h3 className="text-[14px] font-semibold text-white mb-3">Chart data</h3>
 
-                {/* Dynamic Controls based on Chart Style */}
-
                 {/* STACKED BAR / GROUPED BAR: X-axis & Group by */}
                 {(currentChart.type === 'stacked_bar' || currentChart.type === 'grouped_bar') && (
                   <div className="space-y-3 mb-3">
@@ -831,7 +942,7 @@ export default function EditChartModal({
                                 key={opt}
                                 type="button"
                                 onClick={() => {
-                                  setCurrentChart((prev) => (prev ? { ...prev, xAxis: opt } : null));
+                                  updateChartConfig({ xAxis: opt });
                                   setIsXAxisOpen(false);
                                 }}
                                 className="w-full px-3 py-2 text-left hover:bg-[#2f3135] text-white flex items-center justify-between cursor-pointer"
@@ -865,7 +976,7 @@ export default function EditChartModal({
                                 key={opt}
                                 type="button"
                                 onClick={() => {
-                                  setCurrentChart((prev) => (prev ? { ...prev, groupBy: opt } : null));
+                                  updateChartConfig({ groupBy: opt });
                                   setIsGroupByOpen(false);
                                 }}
                                 className="w-full px-3 py-2 text-left hover:bg-[#2f3135] text-white flex items-center justify-between cursor-pointer"
@@ -903,7 +1014,7 @@ export default function EditChartModal({
                               key={opt}
                               type="button"
                               onClick={() => {
-                                setCurrentChart((prev) => (prev ? { ...prev, xAxis: opt } : null));
+                                updateChartConfig({ xAxis: opt });
                                 setIsXAxisOpen(false);
                               }}
                               className="w-full px-3 py-2 text-left hover:bg-[#2f3135] text-white flex items-center justify-between cursor-pointer"
@@ -940,7 +1051,7 @@ export default function EditChartModal({
                               key={opt}
                               type="button"
                               onClick={() => {
-                                setCurrentChart((prev) => (prev ? { ...prev, xAxis: opt } : null));
+                                updateChartConfig({ xAxis: opt });
                                 setIsXAxisOpen(false);
                               }}
                               className="w-full px-3 py-2 text-left hover:bg-[#2f3135] text-white flex items-center justify-between cursor-pointer"
@@ -963,8 +1074,8 @@ export default function EditChartModal({
                     </label>
                     <select
                       value={currentChart.timeGranularity || 'Day'}
-                      onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, timeGranularity: e.target.value as any } : null))}
-                      className="w-full h-10 px-3 bg-[#252628] border border-[#37383b] rounded-lg text-white text-[13px] outline-none"
+                      onChange={(e) => updateChartConfig({ timeGranularity: e.target.value as any })}
+                      className="w-full h-10 px-3 bg-[#252628] border border-[#37383b] rounded-lg text-white text-[13px] outline-none cursor-pointer"
                     >
                       <option value="Day">Day</option>
                       <option value="Week">Week</option>
@@ -983,13 +1094,13 @@ export default function EditChartModal({
                         min="1"
                         max="30"
                         value={currentChart.timeDurationValue || 2}
-                        onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, timeDurationValue: parseInt(e.target.value) || 2 } : null))}
+                        onChange={(e) => updateChartConfig({ timeDurationValue: parseInt(e.target.value) || 2 })}
                         className="h-10 px-3 bg-[#252628] border border-[#37383b] rounded-lg text-white text-[13px] outline-none"
                       />
                       <select
                         value={currentChart.timeDurationUnit || 'Weeks'}
-                        onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, timeDurationUnit: e.target.value as any } : null))}
-                        className="h-10 px-3 bg-[#252628] border border-[#37383b] rounded-lg text-white text-[13px] outline-none"
+                        onChange={(e) => updateChartConfig({ timeDurationUnit: e.target.value as any })}
+                        className="h-10 px-3 bg-[#252628] border border-[#37383b] rounded-lg text-white text-[13px] outline-none cursor-pointer"
                       >
                         <option value="Days">Days</option>
                         <option value="Weeks">Weeks</option>
@@ -1005,37 +1116,95 @@ export default function EditChartModal({
                     {currentChart.type === 'donut' ? 'Measure' : currentChart.type === 'number' ? 'Value' : 'Y-axis'}
                   </label>
                   <div className="grid grid-cols-2 gap-2">
+                    {/* Value Type with interactive Submenu matching video */}
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => setIsValueDropdownOpen((v) => !v)}
                         className="w-full h-10 px-3 bg-[#252628] hover:bg-[#2c2d30] border border-[#37383b] rounded-lg flex items-center justify-between text-white text-[13px] cursor-pointer"
                       >
-                        <span>{currentChart.valueType || 'Task'}</span>
-                        <ChevronDown className="w-4 h-4 text-[#8a8886]" />
+                        <span className="truncate">{currentChart.valueType || 'Task'}</span>
+                        <ChevronDown className="w-4 h-4 text-[#8a8886] shrink-0" />
                       </button>
 
                       {isValueDropdownOpen && (
-                        <div className="absolute top-11 left-0 w-44 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px]">
+                        <div className="absolute top-11 left-0 w-48 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px] animate-in fade-in zoom-in-95 duration-100">
+                          {/* Task */}
                           <button
                             type="button"
                             onClick={() => {
-                              setCurrentChart((prev) => (prev ? { ...prev, valueType: 'Task' } : null));
+                              updateChartConfig({ valueType: 'Task', aggregation: 'Count' });
                               setIsValueDropdownOpen(false);
                             }}
-                            className="w-full px-3 py-2 flex items-center gap-2 text-white hover:bg-[#2f3135] cursor-pointer"
+                            className="w-full px-3 py-2 flex items-center justify-between text-white hover:bg-[#2f3135] cursor-pointer"
                           >
-                            <Check className="w-4 h-4 text-white" />
                             <span>Task</span>
+                            {currentChart.valueType === 'Task' && <Check className="w-3.5 h-3.5 text-white" />}
                           </button>
-                          <div className="px-3 py-2 flex items-center justify-between text-[#8a8886] hover:text-white hover:bg-[#2f3135] cursor-pointer">
-                            <span>Time</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
+
+                          {/* Time > */}
+                          <div className="relative group/time">
+                            <div className="px-3 py-2 flex items-center justify-between text-white hover:bg-[#2f3135] cursor-pointer">
+                              <span>Time</span>
+                              <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                            </div>
+                            <div className="hidden group-hover/time:block absolute left-full top-0 ml-1 w-44 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 z-50">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateChartConfig({ valueType: 'Time to complete', aggregation: 'Average' });
+                                  setIsValueDropdownOpen(false);
+                                }}
+                                className="w-full px-3 py-2 text-left text-white hover:bg-[#2f3135] cursor-pointer"
+                              >
+                                Time to complete
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateChartConfig({ valueType: 'Time in section', aggregation: 'Average' });
+                                  setIsValueDropdownOpen(false);
+                                }}
+                                className="w-full px-3 py-2 text-left text-white hover:bg-[#2f3135] cursor-pointer"
+                              >
+                                Time in section
+                              </button>
+                            </div>
                           </div>
-                          <div className="px-3 py-2 flex items-center justify-between text-[#8a8886] hover:text-white hover:bg-[#2f3135] cursor-pointer">
-                            <span>Time entry</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
+
+                          {/* Time entry > */}
+                          <div className="relative group/timeentry">
+                            <div className="px-3 py-2 flex items-center justify-between text-white hover:bg-[#2f3135] cursor-pointer">
+                              <span>Time entry</span>
+                              <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                            </div>
+                            <div className="hidden group-hover/timeentry:block absolute left-full top-0 ml-1 w-44 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 z-50">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateChartConfig({ valueType: 'Estimated time', aggregation: 'Sum', unitOfTime: 'Default' });
+                                  setIsValueDropdownOpen(false);
+                                }}
+                                className="w-full px-3 py-2 text-left text-white hover:bg-[#2f3135] cursor-pointer flex items-center justify-between"
+                              >
+                                <span>Estimated time</span>
+                                {currentChart.valueType === 'Estimated time' && <Check className="w-3.5 h-3.5 text-white" />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateChartConfig({ valueType: 'Actual time', aggregation: 'Sum', unitOfTime: 'Default' });
+                                  setIsValueDropdownOpen(false);
+                                }}
+                                className="w-full px-3 py-2 text-left text-white hover:bg-[#2f3135] cursor-pointer flex items-center justify-between"
+                              >
+                                <span>Actual time</span>
+                                {currentChart.valueType === 'Actual time' && <Check className="w-3.5 h-3.5 text-white" />}
+                              </button>
+                            </div>
                           </div>
+
+                          {/* Custom field */}
                           <div className="px-3 py-2 flex items-center justify-between text-[#8a8886] hover:text-white hover:bg-[#2f3135] cursor-pointer">
                             <span>Custom field</span>
                             <ChevronRight className="w-3.5 h-3.5" />
@@ -1044,6 +1213,7 @@ export default function EditChartModal({
                       )}
                     </div>
 
+                    {/* Aggregation */}
                     <div className="relative">
                       <button
                         type="button"
@@ -1055,13 +1225,13 @@ export default function EditChartModal({
                       </button>
 
                       {isCountDropdownOpen && (
-                        <div className="absolute top-11 left-0 w-32 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px]">
+                        <div className="absolute top-11 left-0 w-32 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px] animate-in fade-in zoom-in-95 duration-100">
                           {['Count', 'Sum', 'Average'].map((agg) => (
                             <button
                               key={agg}
                               type="button"
                               onClick={() => {
-                                setCurrentChart((prev) => (prev ? { ...prev, aggregation: agg } : null));
+                                updateChartConfig({ aggregation: agg });
                                 setIsCountDropdownOpen(false);
                               }}
                               className="w-full px-3 py-2 flex items-center justify-between text-white hover:bg-[#2f3135] cursor-pointer"
@@ -1074,6 +1244,43 @@ export default function EditChartModal({
                       )}
                     </div>
                   </div>
+
+                  {/* Unit of time selector (when Time entry is selected) */}
+                  {(currentChart.valueType === 'Estimated time' || currentChart.valueType === 'Actual time') && (
+                    <div className="mt-3">
+                      <label className="text-[11px] text-[#8a8886] font-medium block mb-1.5">
+                        Unit of time
+                      </label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setIsUnitOfTimeOpen((v) => !v)}
+                          className="w-full h-10 px-3 bg-[#252628] hover:bg-[#2c2d30] border border-[#37383b] rounded-lg flex items-center justify-between text-white text-[13px] cursor-pointer"
+                        >
+                          <span>{currentChart.unitOfTime || 'Default'}</span>
+                          <ChevronDown className="w-4 h-4 text-[#8a8886]" />
+                        </button>
+                        {isUnitOfTimeOpen && (
+                          <div className="absolute top-11 left-0 right-0 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px] animate-in fade-in zoom-in-95 duration-100">
+                            {['Default', 'Minutes', 'Hours', 'Days', 'Weeks', 'Months', 'Years'].map((unit) => (
+                              <button
+                                key={unit}
+                                type="button"
+                                onClick={() => {
+                                  updateChartConfig({ unitOfTime: unit as any });
+                                  setIsUnitOfTimeOpen(false);
+                                }}
+                                className="w-full px-3 py-2 text-left hover:bg-[#2f3135] text-white flex items-center justify-between cursor-pointer"
+                              >
+                                <span>{unit}</span>
+                                {(currentChart.unitOfTime || 'Default') === unit && <Check className="w-3.5 h-3.5 text-white" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Show as percentage toggle */}
@@ -1082,7 +1289,7 @@ export default function EditChartModal({
                     <input
                       type="checkbox"
                       checked={!!currentChart.showAsPercentage}
-                      onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, showAsPercentage: e.target.checked } : null))}
+                      onChange={(e) => updateChartConfig({ showAsPercentage: e.target.checked })}
                       className="rounded border-[#37383b] bg-[#252628] text-[#4573d2] focus:ring-0"
                     />
                     <span>Show as percentage</span>
@@ -1131,7 +1338,7 @@ export default function EditChartModal({
                     </button>
 
                     {isAddFilterOpen && (
-                      <div className="absolute top-9 left-0 w-52 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px]">
+                      <div className="absolute top-9 left-0 w-52 z-50 bg-[#252628] border border-[#3b3d42] rounded-xl shadow-2xl py-1.5 text-[13px] animate-in fade-in zoom-in-95 duration-100">
                         <button
                           type="button"
                           onClick={() => handleAddFilter('completion', 'Incomplete', 'incomplete')}
@@ -1175,7 +1382,7 @@ export default function EditChartModal({
                       <input
                         type="checkbox"
                         checked={currentChart.dataLabels !== false}
-                        onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, dataLabels: e.target.checked } : null))}
+                        onChange={(e) => updateChartConfig({ dataLabels: e.target.checked })}
                         className="rounded border-[#37383b] bg-[#252628] text-[#4573d2] focus:ring-0"
                       />
                       <span>Data labels</span>
@@ -1185,7 +1392,7 @@ export default function EditChartModal({
                         <input
                           type="checkbox"
                           checked={!!currentChart.benchmarkLine}
-                          onChange={(e) => setCurrentChart((prev) => (prev ? { ...prev, benchmarkLine: e.target.checked } : null))}
+                          onChange={(e) => updateChartConfig({ benchmarkLine: e.target.checked })}
                           className="rounded border-[#37383b] bg-[#252628] text-[#4573d2] focus:ring-0"
                         />
                         <span>Benchmark line</span>

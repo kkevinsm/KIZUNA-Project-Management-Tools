@@ -9,6 +9,12 @@ import {
   Edit2,
   MoreHorizontal,
   ChevronRight,
+  CheckSquare,
+  Indent,
+  Outdent,
+  Code,
+  Link,
+  Smile,
 } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { useApp } from '@/context/AppContext';
@@ -135,6 +141,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
 
   const [isAddWidgetMenuOpen, setIsAddWidgetMenuOpen] = useState(false);
   const [activeMenuWidgetId, setActiveMenuWidgetId] = useState<string | null>(null);
+  const [focusedTextWidgetId, setFocusedTextWidgetId] = useState<string | null>(null);
 
   const [editingWidget, setEditingWidget] = useState<ChartConfig | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -229,6 +236,22 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
     });
   };
 
+  const insertFormatting = (id: string, prefix: string, suffix: string = '') => {
+    setWidgets((prev) => {
+      const next = prev.map((w) => {
+        if (w.id === id) {
+          const current = w.textContent || '';
+          return { ...w, textContent: current ? `${current}\n${prefix}${suffix}` : `${prefix}${suffix}` };
+        }
+        return w;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('kizuna_dashboard_widgets', JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
   const handleResizeWidget = (id: string) => {
     const next = widgets.map((w) => {
       if (w.id === id) {
@@ -309,6 +332,17 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
       }
       return true;
     }).length;
+  };
+
+  // Get KPI subtitle filter text
+  const getKpiFilterSubtitle = (widget: ChartConfig) => {
+    if (widget.id === 'w-completed' || widget.id === 'w-incomplete') {
+      return 'Task completion status';
+    }
+    if (widget.id === 'w-overdue') {
+      return 'Due date';
+    }
+    return '';
   };
 
   const kpiWidgets = widgets.filter((w) => w.size === 'kpi');
@@ -394,6 +428,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
           {kpiWidgets.map((w) => {
             const val = computeKpiValue(w);
             const isHovered = hoveredWidgetId === w.id;
+            const subtitleTag = getKpiFilterSubtitle(w);
 
             return (
               <div
@@ -402,7 +437,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                 onMouseLeave={() => setHoveredWidgetId(null)}
                 className="bg-[#252628] border border-[#323438] hover:border-[#45474c] rounded-xl p-4 flex flex-col justify-between transition-all relative group shadow-sm min-h-[145px]"
               >
-                {/* Header Title & Hover icons */}
+                {/* Header Title & Hover edit icon */}
                 <div className="flex items-center justify-between">
                   <h4 className="text-[13px] text-white font-medium truncate">{w.title}</h4>
                   {isHovered && (
@@ -410,7 +445,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(w)}
-                        className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
+                        className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors cursor-pointer"
                         title="Edit chart"
                       >
                         <Edit2 className="w-3 h-3" />
@@ -420,14 +455,19 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                 </div>
 
                 {/* Big Number in Center */}
-                <div className="my-2 text-center">
+                <div className="my-1.5 text-center">
                   <span className="text-[44px] font-normal text-white leading-none tracking-tight">
                     {val}
                   </span>
                 </div>
 
-                {/* Footer: Filter Button that opens Edit chart modal */}
-                <div className="pt-2 border-t border-[#303235] flex items-center justify-between">
+                {/* Footer: Filter Subtitle & Filter Button (Matching Video 00:00 - 00:10) */}
+                <div className="pt-2 border-t border-[#303235] flex flex-col items-center justify-center">
+                  {subtitleTag && (
+                    <span className="text-[10px] text-[#8a8886] mb-1 font-medium transition-opacity">
+                      {subtitleTag}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleOpenEdit(w)}
@@ -449,27 +489,30 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
             const isHovered = hoveredWidgetId === w.id;
             const isText = w.type === 'text';
             const isMenuOpen = activeMenuWidgetId === w.id;
+            const isTextFocused = focusedTextWidgetId === w.id;
 
-            // Render Text Card matching media_1793693301430_4837ecc5.png
+            // Render Text Card matching media_1793693301430_4837ecc5.png & Video 00:14 - 00:20
             if (isText) {
               return (
                 <div
                   key={w.id}
                   onMouseEnter={() => setHoveredWidgetId(w.id)}
                   onMouseLeave={() => setHoveredWidgetId(null)}
+                  onClick={() => setFocusedTextWidgetId(w.id)}
                   className={`bg-[#252628] border border-[#323438] hover:border-[#45474c] rounded-xl p-5 flex flex-col justify-between transition-all relative group shadow-sm min-h-[290px] ${
                     w.colSpan === 2 ? 'col-span-1 lg:col-span-2' : 'col-span-1'
                   }`}
                 >
                   <div className="flex items-start justify-between flex-1">
                     {/* Top Left: 6 dots drag icon & placeholder/content */}
-                    <div className="flex items-start gap-2.5 flex-1 mr-2">
+                    <div className="flex items-start gap-2.5 flex-1 mr-2 h-full">
                       <GripVertical className="w-4 h-4 text-[#6d6e72] mt-0.5 cursor-grab active:cursor-grabbing shrink-0" />
                       <textarea
                         value={w.textContent || ''}
+                        onFocus={() => setFocusedTextWidgetId(w.id)}
                         onChange={(e) => handleUpdateTextContent(w.id, e.target.value)}
-                        placeholder="Add text, images, links and more to this dashboard."
-                        className="w-full h-full min-h-[220px] bg-transparent text-[#e8e8e9] placeholder-[#8a8b90] text-[13.5px] leading-relaxed resize-none focus:outline-none focus:ring-0 border-0 p-0"
+                        placeholder={isTextFocused ? 'Type / for menu' : 'Add text, images, links and more to this dashboard.'}
+                        className="w-full h-full min-h-[200px] bg-transparent text-[#e8e8e9] placeholder-[#8a8b90] text-[13.5px] leading-relaxed resize-none focus:outline-none focus:ring-0 border-0 p-0"
                       />
                     </div>
 
@@ -556,6 +599,128 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                       )}
                     </div>
                   </div>
+
+                  {/* Rich Text Formatting Toolbar on Focus (Video Frame 00:15 - 00:20) */}
+                  {isTextFocused && (
+                    <div
+                      className="flex items-center flex-wrap gap-1 pt-2.5 mt-2 border-t border-[#303235] text-[#8a8886] animate-in fade-in duration-150"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '**', '**')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded font-bold text-[12px] transition-colors cursor-pointer"
+                        title="Bold (Ctrl+B)"
+                      >
+                        B
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '*', '*')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded italic text-[12px] transition-colors cursor-pointer"
+                        title="Italic (Ctrl+I)"
+                      >
+                        I
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '<u>', '</u>')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded underline text-[12px] transition-colors cursor-pointer"
+                        title="Underline (Ctrl+U)"
+                      >
+                        U
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '~~', '~~')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded line-through text-[12px] transition-colors cursor-pointer"
+                        title="Strikethrough"
+                      >
+                        S
+                      </button>
+
+                      <div className="h-4 w-px bg-[#383a3d] mx-1" />
+
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '1. ')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded text-[11px] font-mono transition-colors cursor-pointer"
+                        title="Numbered list"
+                      >
+                        1.
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '• ')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded text-[14px] leading-none transition-colors cursor-pointer"
+                        title="Bulleted list"
+                      >
+                        •
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '- [ ] ')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded transition-colors cursor-pointer"
+                        title="Task checklist"
+                      >
+                        <CheckSquare className="w-3.5 h-3.5" />
+                      </button>
+
+                      <div className="h-4 w-px bg-[#383a3d] mx-1" />
+
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '  ')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded transition-colors cursor-pointer"
+                        title="Decrease indent"
+                      >
+                        <Outdent className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '    ')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded transition-colors cursor-pointer"
+                        title="Increase indent"
+                      >
+                        <Indent className="w-3.5 h-3.5" />
+                      </button>
+
+                      <div className="h-4 w-px bg-[#383a3d] mx-1" />
+
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '`', '`')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded transition-colors cursor-pointer"
+                        title="Code block"
+                      >
+                        <Code className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '[link](', ')')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded transition-colors cursor-pointer"
+                        title="Insert link"
+                      >
+                        <Link className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '😊 ')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded transition-colors cursor-pointer"
+                        title="Add emoji"
+                      >
+                        <Smile className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertFormatting(w.id, '@')}
+                        className="w-7 h-7 flex items-center justify-center hover:text-white hover:bg-[#343538] rounded text-[13px] font-medium transition-colors cursor-pointer"
+                        title="Mention someone"
+                      >
+                        @
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             }
@@ -586,7 +751,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                         <button
                           type="button"
                           onClick={() => handleResizeWidget(w.id)}
-                          className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
+                          className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors cursor-pointer"
                           title="Resize / Expand"
                         >
                           <Maximize2 className="w-3.5 h-3.5" />
@@ -594,7 +759,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(w)}
-                          className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors"
+                          className="p-1 hover:text-white rounded hover:bg-[#343538] transition-colors cursor-pointer"
                           title="Edit chart"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -689,14 +854,14 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                   </div>
                 </div>
 
-                {/* Chart Body Renderings matching Screenshots 1, 2, 3 */}
+                {/* Chart Body Renderings matching Screenshots & Video */}
                 <div className="flex-1 my-3 flex items-center justify-center">
                   {/* 1. Bar Chart: Total tasks by section */}
                   {w.type === 'bar' && (
                     <div className="w-full h-[180px] flex items-center">
                       <div className="h-full flex items-center justify-center pr-2">
                         <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
-                          Task count
+                          {w.valueType === 'Estimated time' ? 'Estimated time (in minutes)' : 'Task count'}
                         </span>
                       </div>
 
@@ -748,7 +913,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                     <div className="w-full h-[180px] flex items-center">
                       <div className="h-full flex items-center justify-center pr-2">
                         <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
-                          Task count
+                          {w.valueType === 'Estimated time' ? 'Estimated time (in minutes)' : 'Task count'}
                         </span>
                       </div>
                       <div className="flex-1 h-full flex flex-col justify-between">
@@ -808,7 +973,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                     <div className="w-full h-[180px] flex items-center">
                       <div className="h-full flex items-center justify-center pr-2">
                         <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
-                          Task count
+                          {w.valueType === 'Estimated time' ? 'Estimated time (in minutes)' : 'Task count'}
                         </span>
                       </div>
                       <div className="flex-1 h-full flex flex-col justify-between">
@@ -912,10 +1077,9 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                   {/* 3. Lollipop Chart: Total tasks by project */}
                   {w.type === 'lollipop' && (
                     <div className="w-full h-[180px] flex items-center">
-                      {/* Y-axis label */}
                       <div className="h-full flex items-center justify-center pr-2">
                         <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
-                          Task count
+                          {w.valueType === 'Estimated time' ? 'Estimated time (in minutes)' : 'Task count'}
                         </span>
                       </div>
 
@@ -956,7 +1120,7 @@ export default function TaskDashboard({ tasks, projectName }: TaskDashboardProps
                     <div className="w-full h-[180px] flex items-center">
                       <div className="h-full flex items-center justify-center pr-2">
                         <span className="text-[10px] text-[#8a8886] -rotate-90 whitespace-nowrap">
-                          Task count
+                          {w.valueType === 'Estimated time' ? 'Estimated time (in minutes)' : 'Task count'}
                         </span>
                       </div>
 
