@@ -16,6 +16,7 @@ import {
 import { Task } from '@/lib/types';
 import { useApp } from '@/context/AppContext';
 import CalendarOptionsDrawer, { CalendarFilterItem } from './CalendarOptionsDrawer';
+import AddTaskSplitButton from './AddTaskSplitButton';
 
 interface TaskCalendarProps {
   tasks: Task[];
@@ -399,25 +400,33 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
         {/* Left Side: + Add task split button & Date Navigation */}
         <div className="flex items-center gap-3">
           {/* Blue + Add task split button */}
-          <div className="inline-flex items-stretch h-7 rounded-lg overflow-hidden shadow-xs bg-[#4573d2]">
-            <button
-              type="button"
-              onClick={() => openCreateModal('task')}
-              className="flex items-center gap-1.5 bg-[#4573d2] hover:bg-[#3562be] text-white px-2.5 font-medium text-[12.5px] transition-colors h-full"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Add task</span>
-            </button>
-            <div className="w-px bg-white/20 h-full" />
-            <button
-              type="button"
-              onClick={() => openCreateModal('task')}
-              className="flex items-center justify-center bg-[#4573d2] hover:bg-[#3562be] text-white px-1.5 transition-colors h-full"
-              title="More options"
-            >
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <AddTaskSplitButton
+            onAddTask={(type) => {
+              const defaultName = type === 'milestone' ? 'New milestone' : type === 'approval' ? 'New approval' : 'New task';
+              const created = createTask({
+                name: defaultName,
+                dueDate: 'Today – Nov 3',
+                section: 'To do',
+                taskType: type,
+                projectId: 'kevins-first-project',
+                priority: 'Low',
+              });
+              if (created?.id) {
+                openTaskDrawer(created.id);
+              }
+            }}
+            onAddSection={() => {
+              const secName = prompt('Enter new section name:');
+              if (secName && secName.trim()) {
+                createTask({
+                  name: `Task in ${secName.trim()}`,
+                  dueDate: 'Today – Nov 3',
+                  section: secName.trim(),
+                  projectId: 'kevins-first-project',
+                });
+              }
+            }}
+          />
 
           {/* Navigation: < Today > */}
           <div className="flex items-center gap-1 ml-1 text-[#8a8886]">

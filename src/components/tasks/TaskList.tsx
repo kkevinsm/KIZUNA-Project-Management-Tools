@@ -42,6 +42,7 @@ import {
 import { useApp } from '@/context/AppContext';
 import TaskRow from '@/components/tasks/TaskRow';
 import ListOptionsDrawer from '@/components/tasks/ListOptionsDrawer';
+import AddTaskSplitButton from '@/components/tasks/AddTaskSplitButton';
 import { Task, PriorityLevel, CustomColumn } from '@/lib/types';
 
 interface TaskListProps {
@@ -57,6 +58,7 @@ export default function TaskList({
     createTask,
     updateTask,
     deleteTask,
+    openTaskDrawer,
   } = useApp();
 
   // Sections state
@@ -428,51 +430,27 @@ export default function TaskList({
       {/* Action Toolbar for List View */}
       <div className="h-[44px] min-h-[44px] px-6 border-b border-[#2b2c2e] flex items-center justify-between text-[13px] relative z-20">
         {/* Add task split button */}
-        <div className="relative inline-flex items-stretch h-7 rounded-lg overflow-hidden shadow-xs bg-[#4573d2]" data-popover>
-          <button
-            type="button"
-            onClick={() => handleQuickAdd('task')}
-            className="flex items-center gap-1.5 bg-[#4573d2] hover:bg-[#3562be] text-white px-2.5 font-medium text-[12.5px] transition-colors h-full"
-          >
-            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Add task</span>
-          </button>
-          <div className="w-px bg-white/20 h-full" />
-          <button
-            type="button"
-            onClick={() => setIsAddMenuOpen((prev) => !prev)}
-            className="flex items-center justify-center bg-[#4573d2] hover:bg-[#3562be] text-white px-1.5 transition-colors h-full"
-            title="More task types"
-          >
-            <ChevronDown className="w-3.5 h-3.5" />
-          </button>
-
-          {isAddMenuOpen && (
-            <div className="absolute top-8 left-0 w-44 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-30 text-[13px]">
-              <button
-                onClick={() => handleQuickAdd('task')}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5 text-[#8a8886]" />
-                <span>Task</span>
-              </button>
-              <button
-                onClick={() => handleQuickAdd('milestone')}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
-              >
-                <Diamond className="w-3.5 h-3.5 text-[#e5a000]" />
-                <span>Milestone</span>
-              </button>
-              <button
-                onClick={() => handleQuickAdd('approval')}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
-              >
-                <ThumbsUp className="w-3.5 h-3.5 text-[#4573d2]" />
-                <span>Approval</span>
-              </button>
-            </div>
-          )}
-        </div>
+        <AddTaskSplitButton
+          onAddTask={(type) => {
+            const defaultName = type === 'milestone' ? 'New milestone' : type === 'approval' ? 'New approval' : 'New task';
+            const created = createTask({
+              name: defaultName,
+              section: 'To do',
+              myTasksSection: sections[0] || 'Recently assigned',
+              taskType: type,
+              dueDate: 'Today',
+              projectId: 'kevins-first-project',
+              priority: 'Low',
+            });
+            if (created?.id) {
+              openTaskDrawer(created.id);
+            }
+          }}
+          onAddSection={() => {
+            setGroupField('section');
+            setIsAddingSection(true);
+          }}
+        />
 
         {/* Right action controls */}
         <div className="flex items-center gap-2 text-[#bdbbb9] text-[12px]">
