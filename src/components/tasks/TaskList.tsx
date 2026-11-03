@@ -43,6 +43,7 @@ import { useApp } from '@/context/AppContext';
 import TaskRow from '@/components/tasks/TaskRow';
 import ListOptionsDrawer from '@/components/tasks/ListOptionsDrawer';
 import AddTaskSplitButton from '@/components/tasks/AddTaskSplitButton';
+import FilterPopoverContent, { FilterRule, evaluateTaskFilters } from '@/components/tasks/FilterPopoverContent';
 import { Task, PriorityLevel, CustomColumn } from '@/lib/types';
 
 interface TaskListProps {
@@ -118,7 +119,31 @@ export default function TaskList({
   const [isListOptionsDrawerOpen, setIsListOptionsDrawerOpen] = useState(false);
 
   // Filter, Sort, Group State
-  const [filterMode, setFilterMode] = useState<string>('all'); // default to 'all' or 'incomplete'
+  const [filterMode, setFilterMode] = useState<string>('all');
+  const [filterRules, setFilterRules] = useState<FilterRule[]>([]);
+
+  const handleAddFilterRule = (field: FilterRule['field']) => {
+    const newRule: FilterRule = {
+      id: `filter-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      field,
+      operator: 'is',
+      value: field === 'completion' ? 'incomplete' : field === 'task_type' ? 'task' : 'today',
+    };
+    setFilterRules((prev) => [...prev, newRule]);
+  };
+
+  const handleUpdateFilterRule = (id: string, updates: Partial<FilterRule>) => {
+    setFilterRules((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+  };
+
+  const handleRemoveFilterRule = (id: string) => {
+    setFilterRules((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const handleClearAllFilters = () => {
+    setFilterMode('all');
+    setFilterRules([]);
+  };
   const [sortField, setSortField] = useState<string>('none');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [groupField, setGroupField] = useState<string>('none');
@@ -268,16 +293,7 @@ export default function TaskList({
   // Filter tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
-      if (filterMode === 'incomplete' && t.completed) return false;
-      if (filterMode === 'completed' && !t.completed) return false;
-      if (filterMode === 'due_this_week') {
-        const due = (t.dueDate || '').toLowerCase();
-        if (!due || due.includes('later')) return false;
-      }
-      if (filterMode === 'due_next_week') {
-        const due = (t.dueDate || '').toLowerCase();
-        if (!due.includes('nov 10') && !due.includes('next week')) return false;
-      }
+      if (!evaluateTaskFilters(t, filterMode, filterRules)) return false;
 
       if (searchKeyword.trim()) {
         const q = searchKeyword.toLowerCase();
@@ -288,7 +304,7 @@ export default function TaskList({
 
       return true;
     });
-  }, [tasks, filterMode, searchKeyword]);
+  }, [tasks, filterMode, filterRules, searchKeyword]);
 
   // Sort tasks
   const sortedTasks = useMemo(() => {
@@ -421,7 +437,8 @@ export default function TaskList({
     setSelectedTaskIds(new Set());
   };
 
-  const isFilterActive = filterMode !== 'all';
+  const activeFilterCount = (filterMode !== 'all' ? 1 : 0) + filterRules.length;
+  const isFilterActive = activeFilterCount > 0;
   const isSortActive = sortField !== 'none';
   const isGroupActive = groupField !== 'none';
 
@@ -461,17 +478,17 @@ export default function TaskList({
                     setIsSortPopoverOpen(false);
                     setIsGroupPopoverOpen(false);
                   }}
-                  className="flex items-center gap-1.5 px-2.5 py-1 hover:bg-[#1147a3] transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1 hover:bg-[#1147a3] transition-colors cursor-pointer"
                 >
                   <Filter className="w-3.5 h-3.5" />
-                  <span>Filters: 1</span>
+                  <span>Filters: {activeFilterCount}</span>
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setFilterMode('all');
+                    handleClearAllFilters();
                   }}
-                  className="px-1.5 py-1 hover:bg-[#1147a3] border-l border-[#1d4ea8] text-[#a5c2f7] hover:text-white transition-colors"
+                  className="px-1.5 py-1 hover:bg-[#1147a3] border-l border-[#1d4ea8] text-[#a5c2f7] hover:text-white transition-colors cursor-pointer"
                   title="Clear filter"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -484,7 +501,7 @@ export default function TaskList({
                   setIsSortPopoverOpen(false);
                   setIsGroupPopoverOpen(false);
                 }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors cursor-pointer ${
                   isFilterPopoverOpen
                     ? 'bg-[#2b2c2e] text-white border border-[#37383b]'
                     : 'hover:text-white hover:bg-[#28292c]'
@@ -496,130 +513,16 @@ export default function TaskList({
             )}
 
             {isFilterPopoverOpen && (
-              <div className="absolute right-0 top-8 w-[420px] bg-[#1e1f21] border border-[#383a3d] rounded-xl shadow-2xl p-4 z-40 text-[13px] animate-in fade-in duration-150">
-                <div className="flex items-center justify-between pb-3">
-                  <span className="font-bold text-white text-[14px]">Filters</span>
-                  <button
-                    onClick={() => setFilterMode('all')}
-                    className="text-[12px] text-[#8a8886] hover:text-white transition-colors"
-                  >
-                    Clear
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  <span className="text-[11.5px] font-medium text-[#8a8886] block">
-                    Quick filters
-                  </span>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={() => setFilterMode(filterMode === 'incomplete' ? 'all' : 'incomplete')}
-                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors ${
-                        filterMode === 'incomplete'
-                          ? 'bg-[#252628] border-[#3b3d42] text-white'
-                          : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
-                      }`}
-                    >
-                      <Check className="w-3 h-3 text-[#4573d2]" />
-                      <span>Incomplete tasks</span>
-                    </button>
-
-                    <div className="relative">
-                      <button
-                        onClick={() => {
-                          setFilterMode('completed');
-                          setIsCompletedTasksSubmenuOpen((prev) => !prev);
-                        }}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors ${
-                          filterMode === 'completed'
-                            ? 'bg-[#252628] border-[#3b3d42] text-white'
-                            : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
-                        }`}
-                      >
-                        <Check className="w-3 h-3 text-[#4573d2]" />
-                        <span>Completed tasks</span>
-                        <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
-                      </button>
-
-                      {isCompletedTasksSubmenuOpen && (
-                        <div className="absolute left-0 top-full mt-1 w-44 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-50 text-[12px]">
-                          {['All completed', 'Completed today', 'Completed this week'].map((item) => (
-                            <button
-                              key={item}
-                              onClick={() => {
-                                setFilterMode('completed');
-                                setIsCompletedTasksSubmenuOpen(false);
-                              }}
-                              className="w-full text-left px-3 py-1.5 hover:bg-[#2f3135] text-white"
-                            >
-                              {item}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <button
-                      onClick={() => setFilterMode(filterMode === 'due_this_week' ? 'all' : 'due_this_week')}
-                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors ${
-                        filterMode === 'due_this_week'
-                          ? 'bg-[#252628] border-[#3b3d42] text-white'
-                          : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
-                      }`}
-                    >
-                      <CalendarIcon className="w-3.5 h-3.5" />
-                      <span>Due this week</span>
-                    </button>
-
-                    <button
-                      onClick={() => setFilterMode(filterMode === 'due_next_week' ? 'all' : 'due_next_week')}
-                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border transition-colors ${
-                        filterMode === 'due_next_week'
-                          ? 'bg-[#252628] border-[#3b3d42] text-white'
-                          : 'border-[#37383b] text-[#8a8886] hover:text-white hover:border-[#4d4e52]'
-                      }`}
-                    >
-                      <CalendarIcon className="w-3.5 h-3.5" />
-                      <span>Due next week</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-[#2b2c2e] relative">
-                  <button
-                    onClick={() => setIsAddFilterMenuOpen((prev) => !prev)}
-                    className="flex items-center gap-1.5 text-[12.5px] text-[#8a8886] hover:text-white transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add filter</span>
-                    <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
-                  </button>
-
-                  {isAddFilterMenuOpen && (
-                    <div className="absolute left-0 top-full mt-1 w-48 bg-[#252628] border border-[#37383b] rounded-lg shadow-xl py-1 z-50 text-[12.5px]">
-                      {[
-                        { id: 'completion', label: 'Completion status' },
-                        { id: 'created_by', label: 'Created by' },
-                        { id: 'created_on', label: 'Created on' },
-                        { id: 'last_modified', label: 'Last modified on' },
-                        { id: 'completed_on', label: 'Completed on' },
-                        { id: 'task_type', label: 'Task type' },
-                      ].map((f) => (
-                        <button
-                          key={f.id}
-                          onClick={() => {
-                            setIsAddFilterMenuOpen(false);
-                            setIsListOptionsDrawerOpen(true);
-                          }}
-                          className="w-full text-left px-3 py-1.5 text-[#f5f4f3] hover:bg-[#2f3135] transition-colors"
-                        >
-                          {f.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              <div className="absolute right-0 top-8.5 z-50">
+                <FilterPopoverContent
+                  quickFilter={filterMode as any}
+                  onQuickFilterChange={(mode) => setFilterMode(mode)}
+                  rules={filterRules}
+                  onAddRule={handleAddFilterRule}
+                  onUpdateRule={handleUpdateFilterRule}
+                  onRemoveRule={handleRemoveFilterRule}
+                  onClearAll={handleClearAllFilters}
+                />
               </div>
             )}
           </div>
