@@ -11,6 +11,7 @@ import {
   Search,
   CalendarDays,
   Check,
+  X,
 } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { useApp } from '@/context/AppContext';
@@ -94,6 +95,7 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
   const [filterMode, setFilterMode] = useState<'all' | 'incomplete' | 'completed'>('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isOptionsDrawerOpen, setIsOptionsDrawerOpen] = useState(false);
+  const [drawerInitialView, setDrawerInitialView] = useState<'main' | 'filters'>('main');
   const [showWeekends, setShowWeekends] = useState(true);
   const [showMultiDayTasks, setShowMultiDayTasks] = useState(true);
   const [taskColorMode, setTaskColorMode] = useState<'default' | 'priority' | 'project'>('default');
@@ -490,83 +492,78 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
             )}
           </div>
 
-          {/* Filter Dropdown */}
-          <div className="relative">
+            {/* Vertical Divider */}
+            <div className="h-4 w-px bg-[#323337] mx-0.5" />
+
+            {/* Filter Button: Active Blue Pill (Filters: N ✕) or Inactive Neutral Button */}
+            {calendarFilters.length > 0 ? (
+              <div className="flex items-center bg-[#153468] hover:bg-[#1a3f7c] border border-[#2b529a] text-[#8ab4f8] rounded-lg h-7 px-2.5 text-[12px] font-medium transition-colors shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDrawerInitialView('filters');
+                    setIsOptionsDrawerOpen(true);
+                    setIsViewDropdownOpen(false);
+                    setIsFilterOpen(false);
+                  }}
+                  className="flex items-center gap-1.5 hover:text-white transition-colors"
+                >
+                  <ListFilter className="w-3.5 h-3.5 text-[#8ab4f8]" />
+                  <span>Filters: {calendarFilters.length}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClearFilters();
+                  }}
+                  className="ml-1.5 p-0.5 rounded hover:bg-white/10 hover:text-white text-[#8ab4f8] transition-colors"
+                  title="Clear all filters"
+                >
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setDrawerInitialView('filters');
+                  setIsOptionsDrawerOpen(true);
+                  setIsViewDropdownOpen(false);
+                  setIsFilterOpen(false);
+                }}
+                className="flex items-center gap-1.5 text-[#c5c3c0] hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-[#28292c] transition-colors"
+              >
+                <ListFilter className="w-3.5 h-3.5 text-[#8a8886]" />
+                <span>Filter</span>
+              </button>
+            )}
+
+            {/* Vertical Divider */}
+            <div className="h-4 w-px bg-[#323337] mx-0.5" />
+
+            {/* Options Button */}
             <button
               onClick={() => {
-                setIsFilterOpen(!isFilterOpen);
+                setDrawerInitialView('main');
+                setIsOptionsDrawerOpen(true);
                 setIsViewDropdownOpen(false);
-                setIsOptionsDrawerOpen(false);
+                setIsFilterOpen(false);
               }}
               className="flex items-center gap-1.5 text-[#c5c3c0] hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-[#28292c] transition-colors"
             >
-              <ListFilter className="w-3.5 h-3.5 text-[#8a8886]" />
-              <span>Filter</span>
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[#8a8886]" />
+              <span>Options</span>
             </button>
 
-            {isFilterOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 bg-[#252628] border border-[#343639] rounded-xl shadow-xl z-30 py-1">
-                <button
-                  onClick={() => {
-                    handleToolbarFilterChange('all');
-                    setIsFilterOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-1.5 text-[12.5px] flex items-center justify-between hover:bg-[#2e2f33] ${
-                    filterMode === 'all' ? 'text-[#4573d2] font-semibold' : 'text-white'
-                  }`}
-                >
-                  <span>All tasks</span>
-                  {filterMode === 'all' && <Check className="w-3.5 h-3.5" />}
-                </button>
-                <button
-                  onClick={() => {
-                    handleToolbarFilterChange('incomplete');
-                    setIsFilterOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-1.5 text-[12.5px] flex items-center justify-between hover:bg-[#2e2f33] ${
-                    filterMode === 'incomplete' ? 'text-[#4573d2] font-semibold' : 'text-white'
-                  }`}
-                >
-                  <span>Incomplete tasks</span>
-                  {filterMode === 'incomplete' && <Check className="w-3.5 h-3.5" />}
-                </button>
-                <button
-                  onClick={() => {
-                    handleToolbarFilterChange('completed');
-                    setIsFilterOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-1.5 text-[12.5px] flex items-center justify-between hover:bg-[#2e2f33] ${
-                    filterMode === 'completed' ? 'text-[#4573d2] font-semibold' : 'text-white'
-                  }`}
-                >
-                  <span>Completed tasks</span>
-                  {filterMode === 'completed' && <Check className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Options Button */}
-          <button
-            onClick={() => {
-              setIsOptionsDrawerOpen(true);
-              setIsViewDropdownOpen(false);
-              setIsFilterOpen(false);
-            }}
-            className="flex items-center gap-1.5 text-[#c5c3c0] hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-[#28292c] transition-colors"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-[#8a8886]" />
-            <span>Options</span>
-          </button>
-
-          {/* Search Icon */}
-          <button
-            onClick={() => alert('Search in calendar view')}
-            className="hover:text-white p-1.5 rounded-lg hover:bg-[#28292c] transition-colors"
-            title="Search tasks"
-          >
-            <Search className="w-3.5 h-3.5 text-[#8a8886]" />
-          </button>
+            {/* Search Icon */}
+            <button
+              onClick={() => alert('Search in calendar view')}
+              className="hover:text-white p-1.5 rounded-lg hover:bg-[#28292c] transition-colors ml-0.5"
+              title="Search tasks"
+            >
+              <Search className="w-3.5 h-3.5 text-[#8a8886]" />
+            </button>
         </div>
       </div>
 
@@ -835,6 +832,7 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
       <CalendarOptionsDrawer
         isOpen={isOptionsDrawerOpen}
         onClose={() => setIsOptionsDrawerOpen(false)}
+        initialView={drawerInitialView}
         viewMode={viewMode}
         onViewModeChange={(mode) => setViewMode(mode)}
         showWeekends={showWeekends}

@@ -29,6 +29,7 @@ export interface CalendarFilterItem {
 interface CalendarOptionsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  initialView?: 'main' | 'layout' | 'filters' | 'add_filter';
   viewMode: 'weeks' | 'month';
   onViewModeChange: (mode: 'weeks' | 'month') => void;
   showWeekends: boolean;
@@ -47,6 +48,7 @@ interface CalendarOptionsDrawerProps {
 export default function CalendarOptionsDrawer({
   isOpen,
   onClose,
+  initialView = 'main',
   viewMode,
   onViewModeChange,
   showWeekends,
@@ -61,7 +63,13 @@ export default function CalendarOptionsDrawer({
   onRemoveFilter,
   onClearFilters,
 }: CalendarOptionsDrawerProps) {
-  const [currentView, setCurrentView] = useState<'main' | 'layout' | 'filters' | 'add_filter'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'layout' | 'filters' | 'add_filter'>(initialView);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setCurrentView(initialView || 'main');
+    }
+  }, [isOpen, initialView]);
   const [viewName, setViewName] = useState('Calendar');
   const [isZoomDropdownOpen, setIsZoomDropdownOpen] = useState(false);
   const [filterSearch, setFilterSearch] = useState('');
