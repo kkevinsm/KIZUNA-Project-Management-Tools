@@ -88,10 +88,16 @@ export default function TaskRow({
       onClick={() => openTaskDrawer(task.id)}
       className={`group flex items-center h-[38px] min-w-max border-b border-[#262729] hover:bg-[#232427] cursor-pointer transition-colors text-[13px] select-none ${
         isSelected ? 'bg-[#1b2b48] hover:bg-[#203456]' : ''
-      } ${task.completed ? 'opacity-65' : ''}`}
+      }`}
     >
       {/* 1. STICKY LEFT COLUMN: Task Name, Selection Checkbox & Complete Button */}
-      <div className="w-[340px] sm:w-[400px] lg:w-[460px] shrink-0 sticky left-0 z-10 bg-[#1e1f21] group-hover:bg-[#232427] border-r border-[#262729] flex items-center px-3 h-full">
+      <div
+        className={`w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-10 border-r border-[#262729] flex items-center px-3 h-full transition-colors ${
+          isSelected
+            ? 'bg-[#1b2b48] group-hover:bg-[#203456]'
+            : 'bg-[#1e1f21] group-hover:bg-[#232427]'
+        }`}
+      >
         {/* Selection checkbox */}
         <div
           className="w-[24px] flex items-center justify-center shrink-0"
