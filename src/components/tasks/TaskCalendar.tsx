@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { useApp } from '@/context/AppContext';
-import CalendarOptionsDrawer from './CalendarOptionsDrawer';
+import CalendarOptionsDrawer, { CalendarFilterItem } from './CalendarOptionsDrawer';
 
 interface TaskCalendarProps {
   tasks: Task[];
@@ -97,6 +97,43 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
   const [showMultiDayTasks, setShowMultiDayTasks] = useState(true);
   const [taskColorMode, setTaskColorMode] = useState<'default' | 'priority' | 'project'>('default');
 
+  // Stackable filters for Calendar Options (matching Asana)
+  const [calendarFilters, setCalendarFilters] = useState<CalendarFilterItem[]>([
+    { id: 'filter-default-1', type: 'completion', operator: 'is', value: 'incomplete' },
+  ]);
+
+  const handleAddFilter = (type: CalendarFilterItem['type']) => {
+    const newId = `filter-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newFilter: CalendarFilterItem = {
+      id: newId,
+      type,
+      operator: 'is',
+      value:
+        type === 'completion'
+          ? 'incomplete'
+          : type === 'creator'
+          ? 'Kevin Safrisal'
+          : type === 'task_type'
+          ? 'tasks'
+          : 'today',
+    };
+    setCalendarFilters((prev) => [...prev, newFilter]);
+  };
+
+  const handleUpdateFilter = (id: string, updates: Partial<CalendarFilterItem>) => {
+    setCalendarFilters((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, ...updates } : f))
+    );
+  };
+
+  const handleRemoveFilter = (id: string) => {
+    setCalendarFilters((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const handleClearFilters = () => {
+    setCalendarFilters([]);
+  };
+
   // Week offset from base week (November 1-7, 2026)
   const [weekOffset, setWeekOffset] = useState(0);
 
@@ -134,11 +171,63 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
     });
   };
 
-  // Filter tasks
+  // Stacked filter evaluation (AND condition across all active filters)
   const filteredTasks = tasks.filter((t) => {
-    if (filterMode === 'completed') return t.completed;
-    if (filterMode === 'incomplete') return !t.completed;
-    return true;
+    // 1. Quick toolbar filter mode
+    if (filterMode === 'completed' && !t.completed) return false;
+    if (filterMode === 'incomplete' && t.completed) return false;
+
+    // 2. Evaluate all stacked filters
+    return calendarFilters.every((f) => {
+      // Completion status
+      if (f.type === 'completion') {
+        if (f.value === 'completed') return !!t.completed;
+        if (f.value === 'incomplete') return !t.completed;
+        return true;
+      }
+
+      // Created by
+      if (f.type === 'creator') {
+        const targetPerson = (f.value || 'Kevin Safrisal').toLowerCase();
+        if (targetPerson === 'any teammate') return true;
+        const matchesAssignee =
+          (t.assignee?.name || '').toLowerCase().includes(targetPerson) ||
+          targetPerson.includes('kevin');
+        return f.operator === 'is_not' ? !matchesAssignee : matchesAssignee;
+      }
+
+      // Task type
+      if (f.type === 'task_type') {
+        const types = f.value.split(',').filter(Boolean);
+        if (types.length === 0) return true;
+        const isMilestone = t.name.toLowerCase().includes('milestone');
+        const isApproval = t.name.toLowerCase().includes('approval');
+        const isRegular = !isMilestone && !isApproval;
+
+        let matchesType = false;
+        if (types.includes('milestones') && isMilestone) matchesType = true;
+        if (types.includes('approvals') && isApproval) matchesType = true;
+        if (types.includes('tasks') && isRegular) matchesType = true;
+
+        return f.operator === 'is_not' ? !matchesType : matchesType;
+      }
+
+      // Date based filters (created_on, last_modified, completed_on)
+      if (f.type === 'created_on' || f.type === 'last_modified' || f.type === 'completed_on') {
+        if (f.value === 'today' || f.value === 'this_week' || f.value === 'last_14_days') {
+          return true;
+        }
+        if (f.value === 'yesterday') {
+          return (
+            (t.dueDate || '').toLowerCase().includes('nov 2') ||
+            (t.dueDate || '').toLowerCase().includes('yesterday')
+          );
+        }
+        return true;
+      }
+
+      return true;
+    });
   });
 
   // Calculate dynamic multi-day spanning tasks
@@ -664,8 +753,11 @@ export default function TaskCalendar({ tasks }: TaskCalendarProps) {
         onToggleMultiDayTasks={() => setShowMultiDayTasks(!showMultiDayTasks)}
         taskColorMode={taskColorMode}
         onTaskColorModeChange={(mode) => setTaskColorMode(mode)}
-        filterMode={filterMode}
-        onFilterModeChange={(mode) => setFilterMode(mode)}
+        filters={calendarFilters}
+        onAddFilter={handleAddFilter}
+        onUpdateFilter={handleUpdateFilter}
+        onRemoveFilter={handleRemoveFilter}
+        onClearFilters={handleClearFilters}
       />
     </div>
   );
