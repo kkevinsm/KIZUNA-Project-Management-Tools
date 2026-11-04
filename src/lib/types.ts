@@ -114,4 +114,5 @@ export interface Portfolio {
   privacy: string;
   dueDateRange?: string;
   isStarred?: boolean;
+  color?: string;
 }

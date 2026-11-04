@@ -63,6 +63,7 @@ interface AppContextType {
   portfolios: Portfolio[];
   createPortfolio: (name: string, defaultView?: 'List' | 'Timeline' | 'Workload') => Portfolio;
   updatePortfolio: (id: string, updates: Partial<Portfolio>) => void;
+  deletePortfolio: (id: string) => void;
   addComment: (taskId: string, text: string) => void;
   addSubtask: (taskId: string, name: string) => void;
   toggleSubtask: (taskId: string, subtaskId: string) => void;
@@ -605,6 +606,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const deletePortfolio = (id: string) => {
+    setPortfolios((prev) => prev.filter((p) => p.id !== id));
+  };
+
   const addComment = (taskId: string, text: string) => {
     if (!text.trim()) return;
     const newComment: Comment = {
@@ -716,6 +721,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         portfolios,
         createPortfolio,
         updatePortfolio,
+        deletePortfolio,
         addComment,
         addSubtask,
         toggleSubtask,

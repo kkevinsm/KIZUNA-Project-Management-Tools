@@ -64,6 +64,36 @@ export const INITIAL_PORTFOLIOS: Portfolio[] = [
     privacy: 'Public to My workspace',
     dueDateRange: 'Nov 3 – Dec 1',
     isStarred: false,
+    color: '#dedcd8',
+  },
+  {
+    id: 'product-roadmap',
+    name: 'Product roadmap',
+    status: 'On track',
+    statusUpdate: {
+      title: 'Roadmap execution is on track',
+      summary: 'Q4 milestones and key release targets remain on schedule across engineering teams.',
+      updatedAt: '2 days ago',
+      author: 'Kevin Safrisal',
+    },
+    owner: {
+      name: 'Kevin Safrisal',
+      initials: 'KS',
+      avatarColor: '#d84b7f',
+    },
+    members: [
+      {
+        name: 'Kevin Safrisal',
+        initials: 'KS',
+        avatarColor: '#d84b7f',
+      },
+    ],
+    projectIds: ['release-3'],
+    defaultView: 'List',
+    privacy: 'Public to My workspace',
+    dueDateRange: 'Oct 15 – Dec 30',
+    isStarred: true,
+    color: '#d472d4',
   },
 ];
 

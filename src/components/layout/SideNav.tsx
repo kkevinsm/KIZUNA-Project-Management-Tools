@@ -19,7 +19,7 @@ import { useApp } from '@/context/AppContext';
 
 export default function SideNav() {
   const pathname = usePathname();
-  const { projects, openCreateModal, isSidebarCollapsed, openInviteModal } = useApp();
+  const { projects, portfolios, openCreateModal, isSidebarCollapsed, openInviteModal } = useApp();
 
   if (isSidebarCollapsed) {
     return null;
@@ -106,21 +106,32 @@ export default function SideNav() {
                 </Link>
               );
             })}
-            {/* Portfolio in Work list matching Asana screenshot */}
-            <Link
-              href="/portfolios/my-first-portfolio"
-              className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg group transition-colors ${
-                pathname.startsWith('/portfolios/') || pathname.startsWith('/portfolio/')
-                  ? 'bg-[#2a2b2e] text-white font-medium'
-                  : 'text-[#bdbbb9] hover:bg-[#252628] hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <Folder className="w-4 h-4 text-[#9c9a99] group-hover:text-white" />
-                <span>My first portfolio</span>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
-            </Link>
+            {/* Portfolios in Work list matching Asana screenshot */}
+            {portfolios.map((port) => {
+              const isActive =
+                pathname === `/portfolios/${port.id}` ||
+                pathname === `/portfolio/${port.id}`;
+              return (
+                <Link
+                  key={port.id}
+                  href={`/portfolios/${port.id}`}
+                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg group transition-colors ${
+                    isActive
+                      ? 'bg-[#2a2b2e] text-white font-medium'
+                      : 'text-[#bdbbb9] hover:bg-[#252628] hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Folder
+                      className="w-4 h-4 shrink-0 transition-colors"
+                      style={{ color: port.color || '#9c9a99' }}
+                    />
+                    <span className="truncate">{port.name}</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>

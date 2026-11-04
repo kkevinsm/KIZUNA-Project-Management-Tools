@@ -212,8 +212,11 @@ export default function PortfolioDetailPage() {
         <div className="flex items-center justify-between mb-3">
           {/* Title & Status */}
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#28292b] border border-[#37383b] flex items-center justify-center text-white shrink-0">
-              <Folder className="w-4 h-4 text-[#cfcecd]" />
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-[#1e1f21] shrink-0 shadow-xs"
+              style={{ backgroundColor: portfolio.color || '#dedcd8' }}
+            >
+              <Folder className="w-4 h-4 fill-current" />
             </div>
 
             <div className="flex items-center gap-2">
