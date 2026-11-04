@@ -40,7 +40,7 @@ export default function ManagePrivacyModal({ isOpen, onClose }: ManagePrivacyMod
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in duration-150">
+    <div data-modal-overlay className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4 animate-in fade-in duration-150">
       <div className="bg-[#1e1f21] border border-[#38393c] rounded-2xl w-full max-w-[460px] p-6 space-y-4 shadow-2xl relative">
         {/* Header (matching Video 3 frame 005-015) */}
         <div className="flex items-center justify-between pb-1">

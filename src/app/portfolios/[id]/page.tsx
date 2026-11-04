@@ -300,7 +300,8 @@ export default function PortfolioDetailPage() {
             </button>
 
             <button
-              onClick={() => setIsCustomizeOpen(true)}
+              data-customize-trigger
+              onClick={() => setIsCustomizeOpen((prev) => !prev)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252628] hover:bg-[#2f3135] text-[#f5f4f3] border border-[#37383b] text-[12px] font-medium transition-colors cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -880,7 +881,7 @@ export default function PortfolioDetailPage() {
       {/* Share Portfolio Modal (Matching Video & Screenshot)           */}
       {/* ============================================================== */}
       {isShareModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+        <div data-modal-overlay className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-4">
           <div className="bg-[#1e1f21] border border-[#38393c] rounded-2xl w-full max-w-[540px] p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             {/* Header: Title + Copy link icon + Close button */}
             <div className="flex items-center justify-between pb-1">

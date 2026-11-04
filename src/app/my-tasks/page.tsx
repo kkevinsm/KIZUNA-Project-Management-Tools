@@ -52,7 +52,8 @@ export default function MyTasksPage() {
               <span>Share</span>
             </button>
             <button
-              onClick={() => setIsCustomizeOpen(true)}
+              data-customize-trigger
+              onClick={() => setIsCustomizeOpen((prev) => !prev)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252628] hover:bg-[#2f3135] text-[#f5f4f3] border border-[#37383b] text-[12px] font-medium transition-colors cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />

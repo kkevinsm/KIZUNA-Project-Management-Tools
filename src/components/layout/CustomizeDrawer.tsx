@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Plus,
@@ -152,6 +152,49 @@ export default function CustomizeDrawer({
   const [selectedAppCategory, setSelectedAppCategory] = useState('Featured apps');
   const [appSearchQuery, setAppSearchQuery] = useState('');
 
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  // Close drawer on Escape or clicking outside
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isAppsModalOpen) {
+          setIsAppsModalOpen(false);
+        } else if (isFieldModalOpen) {
+          setIsFieldModalOpen(false);
+        } else if (isRulesModalOpen) {
+          setIsRulesModalOpen(false);
+        } else if (isAIStudioModalOpen) {
+          setIsAIStudioModalOpen(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (isAppsModalOpen || isFieldModalOpen || isRulesModalOpen || isAIStudioModalOpen) {
+        return;
+      }
+      const target = e.target as HTMLElement;
+      if (drawerRef.current && !drawerRef.current.contains(target)) {
+        if (target.closest('[data-customize-trigger]') || target.closest('[data-modal-overlay]')) {
+          return;
+        }
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose, isAppsModalOpen, isFieldModalOpen, isRulesModalOpen, isAIStudioModalOpen]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
@@ -178,7 +221,11 @@ export default function CustomizeDrawer({
   return (
     <>
       {/* Right-Side Drawer Panel (matching Video 3 frame 050/055) */}
-      <div className="fixed inset-y-0 right-0 z-40 w-[360px] bg-[#1e1f21] border-l border-[#2e2f32] shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 select-none">
+      <div
+        ref={drawerRef}
+        data-customize-drawer
+        className="fixed inset-y-0 right-0 z-[70] w-[360px] bg-[#1e1f21] border-l border-[#2e2f32] shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 select-none"
+      >
         {/* Drawer Header */}
         <div className="h-14 px-5 border-b border-[#2e2f32] flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -343,7 +390,7 @@ export default function CustomizeDrawer({
       {/* 1. Add Apps Directory Modal (Matching Video 3 frames 024-049)  */}
       {/* ============================================================== */}
       {isAppsModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6 animate-in fade-in duration-150">
+        <div data-modal-overlay className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-6 animate-in fade-in duration-150">
           <div className="bg-[#1e1f21] border border-[#38393c] rounded-2xl w-full max-w-[960px] h-[640px] flex flex-col shadow-2xl overflow-hidden">
             {/* If app detail is selected (matching frame 045: Zoom detail view) */}
             {selectedAppDetail ? (
@@ -519,7 +566,7 @@ export default function CustomizeDrawer({
       {/* 2. Add Field Modal (Matching Video 3 frames 060-068)          */}
       {/* ============================================================== */}
       {isFieldModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 animate-in fade-in duration-150">
+        <div data-modal-overlay className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-[#1e1f21] border border-[#38393c] rounded-2xl w-full max-w-[560px] p-6 space-y-5 shadow-2xl">
             {/* Header with Tabs */}
             <div className="flex items-center justify-between pb-1">
@@ -766,7 +813,7 @@ export default function CustomizeDrawer({
       {/* 3. Automations Modal                                           */}
       {/* ============================================================== */}
       {isRulesModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 animate-in fade-in duration-150">
+        <div data-modal-overlay className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-[#1e1f21] border border-[#38393c] rounded-2xl w-full max-w-[560px] p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -825,7 +872,7 @@ export default function CustomizeDrawer({
       {/* 4. AI Studio Modal                                             */}
       {/* ============================================================== */}
       {isAIStudioModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 animate-in fade-in duration-150">
+        <div data-modal-overlay className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-[#1e1f21] border border-[#38393c] rounded-2xl w-full max-w-[560px] p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -877,7 +924,7 @@ export default function CustomizeDrawer({
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#141517] border border-[#37383b] text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-[13px] animate-in fade-in slide-in-from-bottom-2 duration-150">
+        <div className="fixed bottom-6 right-6 z-[90] bg-[#141517] border border-[#37383b] text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-[13px] animate-in fade-in slide-in-from-bottom-2 duration-150">
           <Check className="w-4 h-4 text-[#4cd195]" />
           <span>{toastMessage}</span>
         </div>

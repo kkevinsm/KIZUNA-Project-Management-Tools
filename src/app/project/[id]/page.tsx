@@ -30,6 +30,8 @@ import {
   TrendingUp,
   FileText,
   AlertCircle,
+  X,
+  Link2,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import TaskRow from '@/components/tasks/TaskRow';
@@ -81,6 +83,8 @@ export default function ProjectDetailPage() {
   const [isOptionsDrawerOpen, setIsOptionsDrawerOpen] = useState(false);
   const [isCustomizeDrawerOpen, setIsCustomizeDrawerOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareInviteEmail, setShareInviteEmail] = useState('');
+  const [shareToast, setShareToast] = useState<string | null>(null);
   const [listColumns, setListColumns] = useState<Record<string, boolean>>({
     assignee: true,
     dueDate: true,
@@ -224,7 +228,7 @@ export default function ProjectDetailPage() {
             </div>
 
             <button
-              onClick={() => alert("Share project modal")}
+              onClick={() => setIsShareModalOpen(true)}
               className="flex items-center gap-1.5 bg-[#4573d2] hover:bg-[#3562be] text-white px-3.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors shadow-xs cursor-pointer"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -232,7 +236,8 @@ export default function ProjectDetailPage() {
             </button>
 
             <button
-              onClick={() => setIsCustomizeDrawerOpen(true)}
+              data-customize-trigger
+              onClick={() => setIsCustomizeDrawerOpen((prev) => !prev)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252628] hover:bg-[#2f3135] text-[#f5f4f3] border border-[#37383b] text-[12px] font-medium transition-colors cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -738,6 +743,189 @@ export default function ProjectDetailPage() {
         onClose={() => setIsCustomizeDrawerOpen(false)}
         contextTitle={project.name}
       />
+
+      {/* ============================================================== */}
+      {/* Share Project Modal                                            */}
+      {/* ============================================================== */}
+      {isShareModalOpen && (
+        <div data-modal-overlay className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-[#1e1f21] border border-[#38393c] rounded-2xl w-full max-w-[540px] p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            {/* Header: Title + Copy link icon + Close button */}
+            <div className="flex items-center justify-between pb-1">
+              <h3 className="text-[18px] font-bold text-white tracking-tight">
+                Share {project.name}
+              </h3>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/project/${project.id}`;
+                    navigator.clipboard.writeText(link);
+                    setShareToast('Project link copied to clipboard');
+                    setTimeout(() => setShareToast(null), 2500);
+                  }}
+                  className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors cursor-pointer"
+                  title="Copy link"
+                >
+                  <Link2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setIsShareModalOpen(false)}
+                  className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Invite with email */}
+            <div className="space-y-3">
+              <label className="block text-[13px] font-semibold text-white">
+                Invite with email
+              </label>
+
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center bg-[#141517] border border-[#37383b] focus-within:border-white rounded-xl overflow-hidden px-3.5 py-1.5 transition-colors">
+                  <input
+                    type="text"
+                    value={shareInviteEmail}
+                    onChange={(e) => setShareInviteEmail(e.target.value)}
+                    placeholder="Add people, emails, or teams..."
+                    className="bg-transparent text-[13.5px] text-white placeholder-[#717377] focus:outline-none flex-1 py-1"
+                  />
+                  <div className="flex items-center gap-1 text-[13px] text-[#cfcecd] hover:text-white cursor-pointer px-2 py-0.5 rounded">
+                    <span>Editor</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                  </div>
+                </div>
+
+                <button
+                  disabled={!shareInviteEmail.trim()}
+                  onClick={() => {
+                    if (!shareInviteEmail.trim()) return;
+                    setShareToast(`Invited ${shareInviteEmail.trim()} to project`);
+                    setShareInviteEmail('');
+                    setTimeout(() => setShareToast(null), 2500);
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
+                    shareInviteEmail.trim()
+                      ? 'bg-[#4573d2] hover:bg-[#3b66be] text-white cursor-pointer'
+                      : 'bg-[#252628] text-[#5d5f63] cursor-not-allowed border border-[#303236]'
+                  }`}
+                >
+                  Invite
+                </button>
+              </div>
+
+              {/* Checkbox */}
+              <div className="space-y-2 pt-1">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="rounded border-[#3a3b3e] bg-[#141517] text-[#4573d2] focus:ring-0 cursor-pointer"
+                  />
+                  <span className="text-[13px] text-white font-normal leading-tight">
+                    Notify when tasks are added to the project
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="border-t border-[#2e2f32]" />
+
+            {/* Access settings */}
+            <div className="space-y-2">
+              <label className="block text-[13px] font-semibold text-white">
+                Access settings
+              </label>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[#141517] border border-[#2e3034] hover:border-[#38393c] cursor-pointer transition-colors">
+                <div className="flex items-center gap-2.5 text-[13.5px] text-white font-medium">
+                  <Lock className="w-4 h-4 text-[#8a8886]" />
+                  <span>My workspace</span>
+                </div>
+                <ChevronDown className="w-4 h-4 text-[#8a8886]" />
+              </div>
+            </div>
+
+            {/* Who has access */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[13px] font-semibold text-white">Who has access</label>
+                <button
+                  onClick={() => {
+                    setShareToast('Notification settings opened');
+                    setTimeout(() => setShareToast(null), 2000);
+                  }}
+                  className="text-[12px] text-[#4573d2] hover:text-[#5f89e2] font-medium cursor-pointer"
+                >
+                  Manage notifications
+                </button>
+              </div>
+
+              {/* Workspace access row */}
+              <div className="flex items-center justify-between p-2 rounded-xl hover:bg-[#252628] transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[#2a2b2e] border border-[#37383b] flex items-center justify-center text-[#8a8886]">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-medium text-white">Everyone at My workspace</div>
+                    <div className="text-[11.5px] text-[#8a8886]">Your organization</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 text-[12.5px] text-[#cfcecd]">
+                  <span>Editor</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                </div>
+              </div>
+
+              {/* Current User row */}
+              <div className="flex items-center justify-between p-2 rounded-xl hover:bg-[#252628] transition-colors">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-bold"
+                    style={{ backgroundColor: currentUser.avatarColor }}
+                  >
+                    {currentUser.initials}
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-medium text-white">{currentUser.name}</div>
+                    <div className="text-[11.5px] text-[#8a8886]">{currentUser.email}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 text-[12.5px] text-[#cfcecd]">
+                  <span>Project admin</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Footer: Copy Project link */}
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => {
+                  const link = `${window.location.origin}/project/${project.id}`;
+                  navigator.clipboard.writeText(link);
+                  setShareToast('Project link copied to clipboard');
+                  setTimeout(() => setShareToast(null), 2500);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#37383b] hover:bg-[#252628] text-white text-[12.5px] font-medium transition-colors cursor-pointer"
+              >
+                <Link2 className="w-3.5 h-3.5 text-[#8a8886]" />
+                <span>Copy project link</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {shareToast && (
+        <div className="fixed bottom-6 right-6 z-[90] bg-[#141517] border border-[#37383b] text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-[13px] animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <Check className="w-4 h-4 text-[#4cd195]" />
+          <span>{shareToast}</span>
+        </div>
+      )}
     </div>
   );
 }
