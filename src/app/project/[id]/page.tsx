@@ -461,16 +461,20 @@ export default function ProjectDetailPage() {
         {/* 1. LIST VIEW                                                   */}
         {/* ============================================================== */}
         {activeTab === 'List' && (
-          <div className="flex flex-col min-h-full justify-between">
-            <div>
+          <div className="flex-1 overflow-x-auto overflow-y-auto w-full">
+            <div className="min-w-max pb-24">
               {/* Table Column Headers with Asana Column Header Menus (matching f_005.jpg & f_025.jpg) */}
-              <div className="flex items-center h-[34px] px-4 border-b border-[#2b2c2e] text-[#8a8886] font-medium text-[12px] select-none">
-                <div className="w-[30px]" />
-                <div className="flex-1 min-w-[200px] pr-4">Name</div>
+              <div className="flex items-center h-[34px] border-b border-[#262729] text-[#8a8886] font-semibold text-[11px] select-none bg-[#1e1f21] sticky top-0 z-30">
+                {/* Sticky Name Column Header (matches TaskRow 440px sticky left) */}
+                <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-35 bg-[#1e1f21] px-4 flex items-center h-full">
+                  <span className="font-semibold text-[11px] uppercase tracking-wider text-[#8a8886]">
+                    Name
+                  </span>
+                </div>
 
                 {/* Assignee Header */}
                 {listColumns.assignee && (
-                  <div className="w-[160px] hidden md:flex items-center relative group/head">
+                  <div className="w-[160px] shrink-0 px-2 flex items-center h-full relative group/head">
                     <button
                       type="button"
                       onClick={() => setOpenColumnMenu(openColumnMenu === 'assignee' ? null : 'assignee')}
@@ -587,7 +591,7 @@ export default function ProjectDetailPage() {
 
                 {/* Due date Header */}
                 {listColumns.dueDate && (
-                  <div className="w-[130px] hidden sm:flex items-center relative group/head">
+                  <div className="w-[130px] shrink-0 px-2 flex items-center h-full relative group/head">
                     <button
                       type="button"
                       onClick={() => setOpenColumnMenu(openColumnMenu === 'dueDate' ? null : 'dueDate')}
@@ -662,7 +666,7 @@ export default function ProjectDetailPage() {
 
                 {/* Priority Header */}
                 {listColumns.priority && (
-                  <div className="w-[110px] hidden sm:flex items-center relative group/head">
+                  <div className="w-[110px] shrink-0 px-2 flex items-center h-full relative group/head">
                     <button
                       type="button"
                       onClick={() => setOpenColumnMenu(openColumnMenu === 'priority' ? null : 'priority')}
@@ -773,7 +777,7 @@ export default function ProjectDetailPage() {
 
                 {/* Status Header (matching f_025.jpg) */}
                 {listColumns.status && (
-                  <div className="w-[110px] hidden lg:flex items-center relative group/head">
+                  <div className="w-[110px] shrink-0 px-2 flex items-center h-full relative group/head">
                     <button
                       type="button"
                       onClick={() => setOpenColumnMenu(openColumnMenu === 'status' ? null : 'status')}
@@ -887,7 +891,7 @@ export default function ProjectDetailPage() {
                 {customColumns.map((col) => (
                   <div
                     key={col.id}
-                    className="w-[120px] hidden xl:flex items-center relative group/head"
+                    className="w-[150px] shrink-0 px-3 flex items-center h-full relative group/head"
                   >
                     <button
                       type="button"
@@ -930,7 +934,7 @@ export default function ProjectDetailPage() {
 
                 {/* Inline "New field" placeholder when added (matching f_048.jpg) */}
                 {isInlineNewFieldActive && (
-                  <div className="w-[130px] px-1 flex items-center">
+                  <div className="w-[150px] shrink-0 px-2 flex items-center h-full">
                     <input
                       autoFocus
                       placeholder="New field"
@@ -967,7 +971,7 @@ export default function ProjectDetailPage() {
                 )}
 
                 {/* + Add Column Button (matching f_038.jpg) */}
-                <div className="w-[30px] flex items-center justify-center">
+                <div className="w-[40px] shrink-0 flex items-center justify-center h-full">
                   <button
                     type="button"
                     onClick={() => setIsAddFieldModalOpen(true)}
@@ -987,10 +991,10 @@ export default function ProjectDetailPage() {
 
                   return (
                     <div key={sectionName} className="border-b border-[#252628]">
-                      {/* Section Header */}
+                      {/* Section Header (Sticky left so section title is always visible while scrolling horizontally) */}
                       <div
                         onClick={() => toggleSection(sectionName)}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-[#252628] cursor-pointer group text-[13px] font-bold text-white transition-colors"
+                        className="sticky left-0 z-20 flex items-center gap-2 px-4 py-2 hover:bg-[#252628] cursor-pointer group text-[13px] font-bold text-white transition-colors bg-[#1e1f21] w-fit"
                       >
                         {isCollapsed ? (
                           <ChevronRight className="w-4 h-4 text-[#8a8886] group-hover:text-white" />
@@ -1027,7 +1031,7 @@ export default function ProjectDetailPage() {
 
                           {/* Inline Add Task Input */}
                           {inlineNewTaskSection === sectionName ? (
-                            <div className="flex items-center h-[38px] px-8 border-b border-[#2b2c2e] bg-[#252628]">
+                            <div className="flex items-center h-[38px] px-8 border-b border-[#2b2c2e] bg-[#252628] sticky left-0 z-10 w-[440px]">
                               <input
                                 type="text"
                                 autoFocus
@@ -1056,8 +1060,9 @@ export default function ProjectDetailPage() {
                           ) : (
                             <button
                               onClick={() => setInlineNewTaskSection(sectionName)}
-                              className="flex items-center gap-2 h-[34px] px-10 text-[12px] text-[#8a8886] hover:text-white hover:bg-[#252628] w-full text-left transition-colors cursor-pointer"
+                              className="flex items-center gap-2 h-[34px] px-10 text-[12px] text-[#8a8886] hover:text-white hover:bg-[#252628] transition-colors cursor-pointer sticky left-0 z-10 w-fit"
                             >
+                              <Plus className="w-3.5 h-3.5" />
                               <span>Add task</span>
                             </button>
                           )}
@@ -1070,17 +1075,17 @@ export default function ProjectDetailPage() {
                 {/* Add Section */}
                 <button
                   onClick={() => alert("Add new section to project")}
-                  className="flex items-center gap-2 px-4 py-3 text-[13px] text-[#8a8886] hover:text-white transition-colors cursor-pointer"
+                  className="flex items-center gap-2 px-4 py-3 text-[13px] text-[#8a8886] hover:text-white transition-colors cursor-pointer sticky left-0 z-10 w-fit"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add section</span>
                 </button>
               </div>
-            </div>
 
-            {/* Bottom Explore Your Project Banner */}
-            <div className="p-4">
-              <ExploreProjectBar />
+              {/* Bottom Explore Your Project Banner */}
+              <div className="p-4 sticky left-0 z-10 max-w-full">
+                <ExploreProjectBar />
+              </div>
             </div>
           </div>
         )}
