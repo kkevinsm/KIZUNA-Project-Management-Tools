@@ -183,15 +183,18 @@ export default function TaskDrawer() {
                 const selectedUser = users.find((u) => u.name === e.target.value);
                 if (selectedUser) {
                   updateTask(activeTask.id, {
+                    assigneeEmail: selectedUser.email.toLowerCase(),
                     assignee: {
                       name: selectedUser.name,
                       initials: selectedUser.initials,
                       avatarColor: selectedUser.avatarColor,
+                      email: selectedUser.email.toLowerCase(),
                       isPlaceholder: false,
                     },
                   });
                 } else {
                   updateTask(activeTask.id, {
+                    assigneeEmail: undefined,
                     assignee: {
                       name: 'Unassigned',
                       initials: '',

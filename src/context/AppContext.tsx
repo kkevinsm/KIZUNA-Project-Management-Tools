@@ -134,6 +134,104 @@ function mergeById<T extends { id: string }>(localArr: T[], remoteArr: T[]): T[]
   return Array.from(map.values());
 }
 
+function mergeProjects(localList: Project[], remoteList: Project[]): Project[] {
+  const map = new Map<string, Project>();
+  localList.forEach((p) => {
+    if (p && p.id) map.set(p.id, p);
+  });
+  remoteList.forEach((remoteP) => {
+    if (!remoteP || !remoteP.id) return;
+    const localP = map.get(remoteP.id);
+    if (!localP) {
+      map.set(remoteP.id, remoteP);
+    } else {
+      const mergedMemberEmails = Array.from(
+        new Set([...(localP.memberEmails || []), ...(remoteP.memberEmails || [])])
+      );
+      const emailMap = new Map<string, Assignee>();
+      (localP.members || []).forEach((m) => {
+        const k = (m.email || m.name).toLowerCase();
+        emailMap.set(k, m);
+      });
+      (remoteP.members || []).forEach((m) => {
+        const k = (m.email || m.name).toLowerCase();
+        if (!emailMap.has(k)) emailMap.set(k, m);
+      });
+      map.set(remoteP.id, {
+        ...localP,
+        ...remoteP,
+        memberEmails: mergedMemberEmails,
+        members: Array.from(emailMap.values()),
+      });
+    }
+  });
+  return Array.from(map.values());
+}
+
+function mergePortfolios(localList: Portfolio[], remoteList: Portfolio[]): Portfolio[] {
+  const map = new Map<string, Portfolio>();
+  localList.forEach((pf) => {
+    if (pf && pf.id) map.set(pf.id, pf);
+  });
+  remoteList.forEach((remotePf) => {
+    if (!remotePf || !remotePf.id) return;
+    const localPf = map.get(remotePf.id);
+    if (!localPf) {
+      map.set(remotePf.id, remotePf);
+    } else {
+      const mergedMemberEmails = Array.from(
+        new Set([...(localPf.memberEmails || []), ...(remotePf.memberEmails || [])])
+      );
+      const emailMap = new Map<string, Assignee>();
+      (localPf.members || []).forEach((m) => {
+        const k = (m.email || m.name).toLowerCase();
+        emailMap.set(k, m);
+      });
+      (remotePf.members || []).forEach((m) => {
+        const k = (m.email || m.name).toLowerCase();
+        if (!emailMap.has(k)) emailMap.set(k, m);
+      });
+      map.set(remotePf.id, {
+        ...localPf,
+        ...remotePf,
+        memberEmails: mergedMemberEmails,
+        members: Array.from(emailMap.values()),
+      });
+    }
+  });
+  return Array.from(map.values());
+}
+
+function mergeTasks(localList: Task[], remoteList: Task[]): Task[] {
+  const map = new Map<string, Task>();
+  remoteList.forEach((t) => {
+    if (t && t.id) map.set(t.id, t);
+  });
+  localList.forEach((localT) => {
+    if (!localT || !localT.id) return;
+    const remoteT = map.get(localT.id);
+    if (!remoteT) {
+      map.set(localT.id, localT);
+    } else {
+      const commentMap = new Map<string, Comment>();
+      (remoteT.comments || []).forEach((c) => commentMap.set(c.id, c));
+      (localT.comments || []).forEach((c) => commentMap.set(c.id, c));
+
+      const subtaskMap = new Map<string, Subtask>();
+      (remoteT.subtasks || []).forEach((st) => subtaskMap.set(st.id, st));
+      (localT.subtasks || []).forEach((st) => subtaskMap.set(st.id, st));
+
+      map.set(localT.id, {
+        ...localT,
+        ...remoteT,
+        comments: Array.from(commentMap.values()),
+        subtasks: Array.from(subtaskMap.values()),
+      });
+    }
+  });
+  return Array.from(map.values());
+}
+
 function mergeUsersByEmail(localUsers: UserAccount[], remoteUsers: UserAccount[]): UserAccount[] {
   const map = new Map<string, UserAccount>();
   remoteUsers.forEach((u) => {
@@ -369,13 +467,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               }
             }
             if (Array.isArray(db.projects) && db.projects.length > 0) {
-              setAllProjects((prev) => normalizeProjects(mergeById(prev, db.projects)));
+              setAllProjects((prev) => normalizeProjects(mergeProjects(prev, db.projects)));
             }
             if (Array.isArray(db.portfolios) && db.portfolios.length > 0) {
-              setAllPortfolios((prev) => normalizePortfolios(mergeById(prev, db.portfolios)));
+              setAllPortfolios((prev) => normalizePortfolios(mergePortfolios(prev, db.portfolios)));
             }
             if (Array.isArray(db.tasks) && db.tasks.length > 0) {
-              setAllTasks((prev) => normalizeTasks(mergeById(prev, db.tasks)));
+              setAllTasks((prev) => normalizeTasks(mergeTasks(prev, db.tasks)));
             }
             if (Array.isArray(db.goals) && db.goals.length > 0) {
               setAllGoals((prev) => mergeById(prev, db.goals));
@@ -392,6 +490,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
     };
   }, []);
+
+  // Real-time synchronization: Poll Cloudflare R2 and sync on tab focus
+  const refreshFromR2 = useCallback(async () => {
+    try {
+      const res = await fetch('/api/storage?action=load_all_db', { cache: 'no-store' });
+      if (res.ok) {
+        const payload = await res.json();
+        const db = payload?.db;
+        if (db) {
+          if (Array.isArray(db.users) && db.users.length > 0) {
+            setAllUsers((prev) => mergeUsersByEmail(prev, db.users));
+          }
+          if (Array.isArray(db.projects) && db.projects.length > 0) {
+            setAllProjects((prev) => normalizeProjects(mergeProjects(prev, db.projects)));
+          }
+          if (Array.isArray(db.portfolios) && db.portfolios.length > 0) {
+            setAllPortfolios((prev) => normalizePortfolios(mergePortfolios(prev, db.portfolios)));
+          }
+          if (Array.isArray(db.tasks) && db.tasks.length > 0) {
+            setAllTasks((prev) => normalizeTasks(mergeTasks(prev, db.tasks)));
+          }
+          if (Array.isArray(db.goals) && db.goals.length > 0) {
+            setAllGoals((prev) => mergeById(prev, db.goals));
+          }
+        }
+      }
+    } catch {
+      // offline
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const handleFocus = () => refreshFromR2();
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') handleFocus();
+    });
+    const interval = setInterval(refreshFromR2, 12000); // sync every 12 seconds
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+  }, [isAuthenticated, refreshFromR2]);
 
   // Save changes to localStorage and sync to Cloudflare R2
   useEffect(() => {
