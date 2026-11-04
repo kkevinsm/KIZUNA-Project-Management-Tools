@@ -136,24 +136,8 @@ export default function SideNav() {
         </div>
       </div>
 
-      {/* Bottom Section: Trial Badge & Invite matching Asana screenshot */}
-      <div className="space-y-3 pt-3 border-t border-[#2b2c2e]">
-        <div className="p-3 bg-[#1e1f21] rounded-xl border border-[#2e3034] space-y-2.5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-5 h-5 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
-            <div>
-              <div className="text-[12px] font-semibold text-white leading-tight">Advanced trial</div>
-              <div className="text-[11px] text-[#8a8886] leading-tight">12 days left</div>
-            </div>
-          </div>
-          <button
-            onClick={() => alert("Billing & Subscription management")}
-            className="w-full py-1.5 px-3 bg-[#f5b324] hover:bg-[#e5a51a] text-black font-semibold rounded-lg text-[12px] transition-colors cursor-pointer"
-          >
-            Add billing info
-          </button>
-        </div>
-
+      {/* Bottom Section: Invite (NOTE: Never add Advanced trial or Billing badges here) */}
+      <div className="pt-3 border-t border-[#2b2c2e]">
         <button
           onClick={openInviteModal}
           className="w-full flex items-center justify-center gap-2 py-2 px-3 text-[#c5c3c0] hover:text-white hover:bg-[#28292c] rounded-lg transition-colors text-[13px] font-medium border border-[#333538] hover:border-[#44464a] cursor-pointer"
