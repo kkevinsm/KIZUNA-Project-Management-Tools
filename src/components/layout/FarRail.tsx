@@ -11,17 +11,20 @@ import {
   Users,
   MoreHorizontal,
   HelpCircle,
-  LogOut,
-  UserCheck,
+  Calendar,
+  SlidersHorizontal,
+  Plus,
   UserPlus,
-  Check,
+  CircleUser,
+  Settings,
+  ArrowRight,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 export default function FarRail() {
   const router = useRouter();
   const pathname = usePathname();
-  const { currentUser, users, switchUser, logout, openInviteModal } = useApp();
+  const { currentUser, logout, openInviteModal, updateUserProfile } = useApp();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -101,65 +104,129 @@ export default function FarRail() {
           {currentUser.initials}
         </button>
 
-        {/* User Switcher / Profile Popover Menu */}
+        {/* User Profile Popover Menu (Matching app.asana.com) */}
         {isMenuOpen && (
           <div
             ref={menuRef}
-            className="absolute left-[64px] bottom-0 w-72 bg-[#252628] border border-[#37383b] rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 duration-150 text-[13px]"
+            className="absolute left-[64px] bottom-1 w-[260px] bg-[#1e1f21] border border-[#333538] rounded-2xl shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-150 text-[13.5px] select-none"
           >
             {/* Header info */}
-            <div className="flex items-center gap-3 p-2 border-b border-[#333538] pb-3 mb-2">
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[13px] font-bold flex-shrink-0"
-                style={{ backgroundColor: currentUser.avatarColor }}
-              >
-                {currentUser.initials}
-              </div>
-              <div className="truncate">
-                <div className="font-semibold text-white truncate">
-                  {currentUser.name}
+            <div className="p-1 mb-2">
+              <div className="flex items-center gap-3 mb-2.5">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-[#1e1f21] text-[14px] font-bold shrink-0 shadow-xs"
+                  style={{ backgroundColor: '#f5a3bf' }}
+                >
+                  {currentUser.initials}
                 </div>
-                <div className="text-[11px] text-[#8a8886] truncate">{currentUser.email}</div>
+                <div className="truncate">
+                  <div className="font-semibold text-white text-[15px] truncate">
+                    {currentUser.name}
+                  </div>
+                  <div className="text-[12.5px] text-[#8a8886] truncate">
+                    {currentUser.email}
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* Profile & Workspace Info */}
-            <div className="space-y-1 mb-2">
-              <div className="text-[10px] font-semibold text-[#8a8886] uppercase px-2 mb-1">
-                Workspace
-              </div>
-              <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-[#2f3135] text-white text-[12px] font-medium">
-                <span>{currentUser.workspace || 'My workspace'}</span>
-                <Check className="w-3.5 h-3.5 text-[#4cd195]" />
-              </div>
-              <Link
-                href="/people/profile"
-                onClick={() => setIsMenuOpen(false)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[#bdbbb9] hover:text-white hover:bg-[#2b2c2e] transition-colors text-[12px]"
+              {/* Set out of office */}
+              <button
+                onClick={() => {
+                  const note = prompt('Set out of office note (optional):', currentUser.outOfOfficeNote || '');
+                  if (note !== null) {
+                    updateUserProfile({
+                      isOutOfOffice: !currentUser.isOutOfOffice,
+                      outOfOfficeNote: note,
+                    });
+                  }
+                }}
+                className="w-full border border-[#38393c] hover:border-[#4f5156] bg-[#252628] hover:bg-[#2b2c2e] text-white text-[13px] py-1.5 px-3 rounded-lg flex items-center gap-2.5 transition-colors cursor-pointer"
               >
-                <UserCheck className="w-3.5 h-3.5" />
-                <span>My Profile</span>
-              </Link>
+                <Calendar className="w-4 h-4 text-[#cfcecd]" />
+                <span>{currentUser.isOutOfOffice ? 'Clear out of office' : 'Set out of office'}</span>
+              </button>
             </div>
 
-            {/* Actions: Add friend & Logout */}
-            <div className="pt-2 border-t border-[#333538] space-y-1">
+            {/* Section 1: Admin console, New workspace, Invite */}
+            <div className="border-t border-[#2e2f32] py-1 space-y-0.5">
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  alert('Admin console: Workspace settings & access controls');
+                }}
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-[#cfcecd]" />
+                <span>Admin console</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  const name = prompt('Enter new workspace name:');
+                  if (name?.trim()) {
+                    updateUserProfile({ workspace: name.trim() });
+                  }
+                }}
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-[#cfcecd]" />
+                <span>New workspace</span>
+              </button>
+
               <button
                 onClick={() => {
                   setIsMenuOpen(false);
                   openInviteModal();
                 }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[#bdbbb9] hover:text-white hover:bg-[#2b2c2e] transition-colors text-[12px]"
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
               >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Invite a teammate</span>
+                <UserPlus className="w-4 h-4 text-[#cfcecd]" />
+                <span>Invite to Asana</span>
+              </button>
+            </div>
+
+            {/* Section 2: Profile, Settings, Add another account */}
+            <div className="border-t border-[#2e2f32] py-1 space-y-0.5">
+              <Link
+                href="/people/profile"
+                onClick={() => setIsMenuOpen(false)}
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
+              >
+                <CircleUser className="w-4 h-4 text-[#cfcecd]" />
+                <span>Profile</span>
+              </Link>
+
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  alert('Settings: Preferences, Display, and Notifications');
+                }}
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
+              >
+                <Settings className="w-4 h-4 text-[#cfcecd]" />
+                <span>Settings</span>
               </button>
 
               <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[#ff6b72] hover:bg-[#47181c] transition-colors text-[12px]"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  router.push('/login');
+                }}
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4 text-[#cfcecd]" />
+                <span>Add another account</span>
+              </button>
+            </div>
+
+            {/* Section 3: Log out */}
+            <div className="border-t border-[#2e2f32] pt-1">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
+              >
+                <ArrowRight className="w-4 h-4 text-[#cfcecd]" />
                 <span>Log out</span>
               </button>
             </div>

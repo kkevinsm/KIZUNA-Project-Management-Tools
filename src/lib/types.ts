@@ -109,17 +109,17 @@ export interface CustomColumn {
   id: string;
   name: string;
   type:
-    | 'single_select'
-    | 'multi_select'
-    | 'date'
-    | 'people'
-    | 'reference'
-    | 'text'
-    | 'number'
-    | 'formula'
-    | 'timer'
-    | 'time_tracking'
-    | 'rollup';
+  | 'single_select'
+  | 'multi_select'
+  | 'date'
+  | 'people'
+  | 'reference'
+  | 'text'
+  | 'number'
+  | 'formula'
+  | 'timer'
+  | 'time_tracking'
+  | 'rollup';
   options?: string[];
   width?: number;
 }
