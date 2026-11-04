@@ -40,6 +40,12 @@ interface AppContextType {
   isInviteModalOpen: boolean;
   openInviteModal: () => void;
   closeInviteModal: () => void;
+  workspaces: string[];
+  createWorkspace: (name: string, initialMemberEmails?: string[]) => Promise<void>;
+  switchWorkspace: (workspaceName: string) => void;
+  isCreateWorkspaceModalOpen: boolean;
+  openCreateWorkspaceModal: () => void;
+  closeCreateWorkspaceModal: () => void;
   login: (email: string, password?: string) => { success: boolean; error?: string };
   loginWithGoogle: (customGoogleAccount?: { name: string; email: string; picture?: string }) => { success: boolean };
   signup: (name: string, email: string, password?: string) => { success: boolean; error?: string };
@@ -248,9 +254,16 @@ function mergeUsersByEmail(localUsers: UserAccount[], remoteUsers: UserAccount[]
         const mergedSharedTasks = Array.from(
           new Set([...(existing.sharedTaskAccessEmails || []), ...(u.sharedTaskAccessEmails || [])])
         );
+        const mergedWorkspaces = Array.from(
+          new Set([
+            ...(existing.workspaces || (existing.workspace ? [existing.workspace] : ['My workspace'])),
+            ...(u.workspaces || (u.workspace ? [u.workspace] : ['My workspace'])),
+          ])
+        );
         map.set(key, {
           ...existing,
           ...u,
+          workspaces: mergedWorkspaces,
           collaboratorEmails: mergedCollabs,
           sharedTaskAccessEmails: mergedSharedTasks,
         });
@@ -278,7 +291,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [createModalType, setCreateModalType] = useState<'task' | 'project'>('task');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isCreateWorkspaceModalOpen, setIsCreateWorkspaceModalOpen] = useState(false);
+  const openCreateWorkspaceModal = useCallback(() => setIsCreateWorkspaceModalOpen(true), []);
+  const closeCreateWorkspaceModal = useCallback(() => setIsCreateWorkspaceModalOpen(false), []);
   const [isHydrated, setIsHydrated] = useState(false);
+
+  const workspaces = useMemo(() => {
+    const list = currentUser?.workspaces && currentUser.workspaces.length > 0
+      ? currentUser.workspaces
+      : [currentUser?.workspace || 'My workspace'];
+    if (currentUser?.workspace && !list.includes(currentUser.workspace)) {
+      return [currentUser.workspace, ...list];
+    }
+    return list;
+  }, [currentUser]);
   const [viewConfigs, setViewConfigs] = useState<Record<string, { name: string; icon?: string }>>({
     List: { name: 'List', icon: '' },
     Board: { name: 'Board', icon: '' },
@@ -334,6 +360,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
       return {
         ...p,
+        workspace: p.workspace || 'My workspace',
         ownerEmail: owner,
         memberEmails,
         members: p.members.filter((m) => !m.name.toLowerCase().includes('alex teammate')),
@@ -352,6 +379,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
       return {
         ...pf,
+        workspace: pf.workspace || 'My workspace',
         ownerEmail: owner,
         memberEmails,
       };
@@ -608,6 +636,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           lastModified: 'Just now',
           description: `Welcome to ${user.name}'s private Kizuna project workspace.`,
           sections: ['To do', 'Doing', 'Done'],
+          workspace: user.workspace || 'My workspace',
         };
         return [...prev, starterProject];
       });
@@ -620,6 +649,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           id: defaultPortfolioId,
           name: 'My first portfolio',
           status: 'On track',
+          workspace: user.workspace || 'My workspace',
           ownerEmail: cleanEmail,
           memberEmails: [cleanEmail],
           owner: {
@@ -676,6 +706,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             priority: 'Medium',
             status: 'On track',
             visibility: 'Only me',
+            workspace: user.workspace || 'My workspace',
             description: 'This task belongs exclusively to your account. Invite teammates or share a project to collaborate.',
             subtasks: [],
             attachments: [],
@@ -693,30 +724,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // MULTI-TENANT DATA ISOLATION & PERMISSION FILTERING
   // ============================================================================
   const myEmail = (currentUser?.email || '').trim().toLowerCase();
+  const currentWorkspaceName = currentUser?.workspace || 'My workspace';
 
   const visibleProjects = useMemo(() => {
     if (!isAuthenticated || !myEmail) return [];
     return allProjects.filter((p) => {
+      const pWs = p.workspace || 'My workspace';
+      if (pWs !== currentWorkspaceName) return false;
+
       const owner = (p.ownerEmail || 'karashii866@gmail.com').toLowerCase();
       if (owner === myEmail) return true;
       if (p.memberEmails?.some((e) => e.toLowerCase() === myEmail)) return true;
       if (p.members?.some((m) => m.email?.toLowerCase() === myEmail)) return true;
       return false;
     });
-  }, [allProjects, isAuthenticated, myEmail]);
+  }, [allProjects, isAuthenticated, myEmail, currentWorkspaceName]);
 
   const visibleProjectIds = useMemo(() => new Set(visibleProjects.map((p) => p.id)), [visibleProjects]);
 
   const visiblePortfolios = useMemo(() => {
     if (!isAuthenticated || !myEmail) return [];
     return allPortfolios.filter((pf) => {
+      const pfWs = pf.workspace || 'My workspace';
+      if (pfWs !== currentWorkspaceName) return false;
+
       const owner = (pf.ownerEmail || pf.owner?.email || 'karashii866@gmail.com').toLowerCase();
       if (owner === myEmail) return true;
       if (pf.memberEmails?.some((e) => e.toLowerCase() === myEmail)) return true;
       if (pf.members?.some((m) => m.email?.toLowerCase() === myEmail)) return true;
       return false;
     });
-  }, [allPortfolios, isAuthenticated, myEmail]);
+  }, [allPortfolios, isAuthenticated, myEmail, currentWorkspaceName]);
 
   // Users whose My Tasks have been explicitly shared with currentUser
   const ownersWhoSharedTasksWithMe = useMemo(() => {
@@ -732,6 +770,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const visibleTasks = useMemo(() => {
     if (!isAuthenticated || !myEmail) return [];
     return allTasks.filter((t) => {
+      if (t.projectId) {
+        if (!visibleProjectIds.has(t.projectId)) return false;
+      } else {
+        const tWs = t.workspace || 'My workspace';
+        if (tWs !== currentWorkspaceName) return false;
+      }
+
       const owner = (t.ownerEmail || 'karashii866@gmail.com').toLowerCase();
       if (owner === myEmail) return true;
       if (t.assigneeEmail?.toLowerCase() === myEmail) return true;
@@ -741,7 +786,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (ownersWhoSharedTasksWithMe.has(owner)) return true;
       return false;
     });
-  }, [allTasks, isAuthenticated, myEmail, visibleProjectIds, ownersWhoSharedTasksWithMe]);
+  }, [allTasks, isAuthenticated, myEmail, visibleProjectIds, ownersWhoSharedTasksWithMe, currentWorkspaceName]);
 
   const myCollaboratorEmails = useMemo(() => {
     const set = new Set<string>();
@@ -779,12 +824,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const visibleGoals = useMemo(() => {
     if (!isAuthenticated || !myEmail) return [];
     return allGoals.filter((g) => {
+      const gWs = g.workspace || 'My workspace';
+      if (gWs !== currentWorkspaceName) return false;
+
       const owner = (g.ownerEmail || 'karashii866@gmail.com').toLowerCase();
       if (owner === myEmail) return true;
       if (g.sharedWithEmails?.some((e) => e.toLowerCase() === myEmail)) return true;
       return false;
     });
-  }, [allGoals, isAuthenticated, myEmail]);
+  }, [allGoals, isAuthenticated, myEmail, currentWorkspaceName]);
 
   const visibleTeamMessages = useMemo(() => {
     if (!isAuthenticated || !myEmail) return [];
@@ -833,6 +881,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let user = allUsers.find((u) => u.email.toLowerCase() === email);
     if (!user) {
       const color = AVATAR_COLORS[allUsers.length % AVATAR_COLORS.length];
+      const wsName = `${name.split(' ')[0]}'s workspace`;
       user = {
         id: `user-google-${Date.now()}`,
         name,
@@ -840,7 +889,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         initials: getInitials(name),
         avatarColor: color,
         avatarUrl: picture,
-        workspace: `${name.split(' ')[0]}'s workspace`,
+        workspace: wsName,
+        workspaces: [wsName],
         role: 'Member',
         collaboratorEmails: [],
         sharedTaskAccessEmails: [],
@@ -893,6 +943,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const color = AVATAR_COLORS[allUsers.length % AVATAR_COLORS.length];
     const cleanName = name.trim() || formatNameFromEmail(cleanEmail);
+    const wsName = `${cleanName.split(' ')[0]}'s workspace`;
     const newUser: UserAccount = {
       id: `user-${Date.now()}`,
       name: cleanName,
@@ -900,7 +951,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       password: password || 'password123',
       initials: getInitials(cleanName),
       avatarColor: color,
-      workspace: `${cleanName.split(' ')[0]}'s workspace`,
+      workspace: wsName,
+      workspaces: [wsName],
       role: 'Member',
       collaboratorEmails: [],
       sharedTaskAccessEmails: [],
@@ -949,7 +1001,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         password: 'password123',
         initials: getInitials(displayName),
         avatarColor: color,
-        workspace: 'My workspace',
+        workspace: currentWorkspaceName,
+        workspaces: [currentWorkspaceName],
         role: 'Invited',
         collaboratorEmails: [myEmail],
         sharedTaskAccessEmails: [],
@@ -1022,7 +1075,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           password: 'password123',
           initials: getInitials(displayName),
           avatarColor: color,
-          workspace: 'My workspace',
+          workspace: currentWorkspaceName,
+          workspaces: [currentWorkspaceName],
           role: 'Invited',
           collaboratorEmails: [myEmail],
           sharedTaskAccessEmails: [],
@@ -1317,6 +1371,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       taskType,
       projectId: resolvedProjectId,
       projectName: project ? project.name : `${currentUser.name.split(' ')[0]}'s project`,
+      workspace: project?.workspace || currentWorkspaceName,
       ownerEmail: myEmail,
       assigneeEmail: taskAssignee.email || myEmail,
       sharedWithEmails: currentUser.sharedTaskAccessEmails || [],
@@ -1324,7 +1379,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       dueDate,
       priority,
       status,
-      visibility: 'My workspace',
+      visibility: currentWorkspaceName,
       description,
       subtasks: [],
       attachments: [],
@@ -1368,6 +1423,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       name,
       joined: true,
       status: 'On track',
+      workspace: currentWorkspaceName,
       ownerEmail: myEmail,
       memberEmails: [myEmail],
       members: [
@@ -1399,6 +1455,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       id,
       name,
       status: 'On track',
+      workspace: currentWorkspaceName,
       ownerEmail: myEmail,
       memberEmails: [myEmail],
       owner: {
@@ -1419,7 +1476,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ],
       projectIds: defaultProjIds,
       defaultView,
-      privacy: 'Public to My workspace',
+      privacy: `Public to ${currentWorkspaceName}`,
       dueDateRange: 'Nov 3 – Dec 1',
       isStarred: false,
       joined: true,
@@ -1511,7 +1568,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateUserProfile = (data: Partial<UserAccount>) => {
     setCurrentUser((prev) => {
-      const updated = { ...prev, ...data };
+      let updatedWorkspaces = prev.workspaces;
+      if (data.workspace && (!updatedWorkspaces || !updatedWorkspaces.includes(data.workspace))) {
+        updatedWorkspaces = Array.from(new Set([...(updatedWorkspaces || [prev.workspace || 'My workspace']), data.workspace]));
+      }
+      const updated = {
+        ...prev,
+        ...data,
+        ...(updatedWorkspaces ? { workspaces: updatedWorkspaces } : {}),
+      };
       setAllUsers((prevUsers) => prevUsers.map((u) => (u.id === prev.id ? updated : u)));
       return updated;
     });
@@ -1521,6 +1586,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const newGoal: Goal = {
       id: `goal-${Date.now()}`,
       title: goalData.title.trim() || 'New Goal',
+      workspace: currentWorkspaceName,
       ownerEmail: myEmail,
       sharedWithEmails: [],
       owner: {
@@ -1530,7 +1596,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         email: myEmail,
       },
       timePeriod: goalData.timePeriod || 'Q4 FY26 Oct 1 - Dec 31',
-      privacy: goalData.privacy || 'Public to My workspace',
+      privacy: goalData.privacy || `Public to ${currentWorkspaceName}`,
       progress: 0,
       status: 'On track',
       dueDate: 'Dec 31',
@@ -1559,6 +1625,182 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAllTeamMessages((prev) => [newMsg, ...prev]);
   };
 
+  const createWorkspace = async (name: string, initialMemberEmails?: string[]) => {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+
+    const currentList = currentUser?.workspaces && currentUser.workspaces.length > 0
+      ? currentUser.workspaces
+      : [currentUser?.workspace || 'My workspace'];
+    const updatedWorkspaces = Array.from(new Set([...currentList, trimmedName]));
+
+    const validMemberEmails = (initialMemberEmails || [])
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => e.length > 0 && e.includes('@'));
+
+    const updatedCurrentUser: UserAccount = {
+      ...currentUser,
+      workspace: trimmedName,
+      workspaces: updatedWorkspaces,
+      collaboratorEmails: Array.from(
+        new Set([...(currentUser.collaboratorEmails || []), ...validMemberEmails])
+      ),
+    };
+
+    // Starter project for this new workspace
+    const starterProjectId = `proj-${trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
+    const starterProject: Project = {
+      id: starterProjectId,
+      name: `${trimmedName} Project`,
+      joined: true,
+      status: 'On track',
+      workspace: trimmedName,
+      ownerEmail: myEmail,
+      memberEmails: Array.from(new Set([myEmail, ...validMemberEmails])),
+      members: [
+        {
+          name: currentUser.name,
+          initials: currentUser.initials,
+          avatarColor: currentUser.avatarColor,
+          email: myEmail,
+          role: 'Project admin',
+        },
+        ...validMemberEmails.map((email) => {
+          const mName = formatNameFromEmail(email);
+          return {
+            name: mName,
+            initials: getInitials(mName),
+            email,
+            role: 'Member',
+          };
+        }),
+      ],
+      portfolios: [],
+      dueDateRange: 'Nov 4 – Dec 15',
+      lastModified: 'Just now',
+      description: `Default project workspace for ${trimmedName}.`,
+      sections: ['To do', 'Doing', 'Done'],
+    };
+
+    // Starter task for this new workspace
+    const starterTask: Task = {
+      id: `task-${Date.now()}`,
+      name: `Welcome to ${trimmedName}`,
+      completed: false,
+      section: 'To do',
+      myTasksSection: 'Do today',
+      projectId: starterProjectId,
+      projectName: starterProject.name,
+      workspace: trimmedName,
+      ownerEmail: myEmail,
+      assigneeEmail: myEmail,
+      assignee: {
+        name: currentUser.name,
+        initials: currentUser.initials,
+        avatarColor: currentUser.avatarColor,
+        email: myEmail,
+      },
+      dueDate: 'Today',
+      priority: 'Medium',
+      status: 'On track',
+      visibility: trimmedName,
+      description: `Welcome to your new ${trimmedName} workspace! Invite teammates or create projects to get started.`,
+      subtasks: [],
+      attachments: [],
+      comments: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    // Manage users: update existing users or create new invited accounts
+    let nextUsers = allUsers.map((u) => (u.id === currentUser.id ? updatedCurrentUser : u));
+    validMemberEmails.forEach((email) => {
+      const existing = nextUsers.find((u) => u.email.toLowerCase() === email);
+      if (existing) {
+        const existingWs = existing.workspaces || [existing.workspace || 'My workspace'];
+        const updatedExisting: UserAccount = {
+          ...existing,
+          workspaces: Array.from(new Set([...existingWs, trimmedName])),
+          collaboratorEmails: Array.from(new Set([...(existing.collaboratorEmails || []), myEmail])),
+        };
+        nextUsers = nextUsers.map((u) => (u.id === existing.id ? updatedExisting : u));
+      } else {
+        const mName = formatNameFromEmail(email);
+        const color = AVATAR_COLORS[nextUsers.length % AVATAR_COLORS.length];
+        const newUser: UserAccount = {
+          id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          name: mName,
+          email,
+          password: 'password123',
+          initials: getInitials(mName),
+          avatarColor: color,
+          workspace: trimmedName,
+          workspaces: [trimmedName],
+          role: 'Invited',
+          collaboratorEmails: [myEmail],
+          sharedTaskAccessEmails: [],
+        };
+        nextUsers.push(newUser);
+      }
+    });
+
+    const nextProjects = [...allProjects, starterProject];
+    const nextTasks = [starterTask, ...allTasks];
+
+    setCurrentUser(updatedCurrentUser);
+    setAllUsers(nextUsers);
+    setAllProjects(nextProjects);
+    setAllTasks(nextTasks);
+    setActiveTaskId(null);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('kizuna_users', JSON.stringify(nextUsers));
+      localStorage.setItem('kizuna_current_user_id', updatedCurrentUser.id);
+      localStorage.setItem('kizuna_projects', JSON.stringify(nextProjects));
+      localStorage.setItem('kizuna_tasks', JSON.stringify(nextTasks));
+    }
+
+    await Promise.all([
+      syncToCloudflareR2('users', nextUsers),
+      syncToCloudflareR2('projects', nextProjects),
+      syncToCloudflareR2('tasks', nextTasks),
+    ]);
+  };
+
+  const switchWorkspace = useCallback(
+    (workspaceName: string) => {
+      const trimmed = workspaceName.trim();
+      if (!trimmed) return;
+
+      setCurrentUser((prev) => {
+        if (prev.workspace === trimmed) return prev;
+        const currentList = prev.workspaces && prev.workspaces.length > 0
+          ? prev.workspaces
+          : [prev.workspace || 'My workspace'];
+        const updatedWorkspaces = Array.from(new Set([...currentList, trimmed]));
+        const updatedUser: UserAccount = {
+          ...prev,
+          workspace: trimmed,
+          workspaces: updatedWorkspaces,
+        };
+
+        setAllUsers((users) => {
+          const nextUsers = users.map((u) => (u.id === prev.id ? updatedUser : u));
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('kizuna_users', JSON.stringify(nextUsers));
+            localStorage.setItem('kizuna_current_user_id', updatedUser.id);
+          }
+          syncToCloudflareR2('users', nextUsers);
+          return nextUsers;
+        });
+
+        return updatedUser;
+      });
+
+      setActiveTaskId(null);
+    },
+    [syncToCloudflareR2]
+  );
+
   return (
     <AppContext.Provider
       value={{
@@ -1571,6 +1813,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         activeTaskId,
         activeTask,
         searchQuery,
+        workspaces,
+        createWorkspace,
+        switchWorkspace,
+        isCreateWorkspaceModalOpen,
+        openCreateWorkspaceModal,
+        closeCreateWorkspaceModal,
         isCreateModalOpen,
         createModalType,
         isSidebarCollapsed,

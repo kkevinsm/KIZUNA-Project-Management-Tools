@@ -9,6 +9,7 @@ export const INITIAL_USERS: UserAccount[] = [
     initials: 'KS',
     avatarColor: '#d84b7f',
     workspace: 'My workspace',
+    workspaces: ['My workspace'],
     role: 'Owner',
     jobTitle: '',
     department: '',
@@ -36,6 +37,7 @@ export const INITIAL_GOALS: Goal[] = [
     progress: 85,
     status: 'On track',
     dueDate: 'Dec 31',
+    workspace: 'My workspace',
   },
 ];
 
@@ -62,6 +64,7 @@ export const INITIAL_PROJECTS: Project[] = [
     id: 'kevins-first-project',
     name: "Kevin's first project",
     joined: true,
+    workspace: 'My workspace',
     status: 'On track',
     ownerEmail: 'karashii866@gmail.com',
     memberEmails: ['karashii866@gmail.com'],
@@ -117,6 +120,7 @@ export const INITIAL_PORTFOLIOS: Portfolio[] = [
     isStarred: false,
     color: '#dedcd8',
     joined: true,
+    workspace: 'My workspace',
     lastModified: '2026-11-03T11:18:00.000Z',
   },
   {
@@ -153,6 +157,7 @@ export const INITIAL_PORTFOLIOS: Portfolio[] = [
     isStarred: false,
     color: '#d472d4',
     joined: true,
+    workspace: 'My workspace',
     lastModified: '2026-11-04T08:30:00.000Z',
   },
 ];

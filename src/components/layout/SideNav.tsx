@@ -84,9 +84,9 @@ export default function SideNav() {
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-5 h-5 rounded bg-[#2a2b2e] border border-[#38393c] flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-                    M
+                    {currentUser.workspace ? currentUser.workspace.charAt(0).toUpperCase() : 'M'}
                   </div>
-                  <span className="truncate">My workspace</span>
+                  <span className="truncate">{currentUser.workspace || 'My workspace'}</span>
                 </div>
                 <ChevronRight className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
               </Link>

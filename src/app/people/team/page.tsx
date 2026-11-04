@@ -105,12 +105,12 @@ export default function PeopleTeamPage() {
         <div className="flex items-center justify-between pb-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#2a2b2e] border border-[#3b3d41] flex items-center justify-center text-white font-bold text-[15px] shadow-sm">
-              M
+              {currentUser.workspace ? currentUser.workspace.charAt(0).toUpperCase() : 'M'}
             </div>
             <div className="flex items-center gap-2">
-              <h1 className="text-[20px] font-bold text-white tracking-tight">My workspace</h1>
+              <h1 className="text-[20px] font-bold text-white tracking-tight">{currentUser.workspace || 'My workspace'}</h1>
               <button
-                onClick={() => showToast('My workspace • Organization default team')}
+                onClick={() => showToast(`${currentUser.workspace || 'My workspace'} • Organization default team`)}
                 className="p-1 rounded text-[#8a8886] hover:text-white transition-colors cursor-pointer"
                 title="Team info"
               >
@@ -169,9 +169,9 @@ export default function PeopleTeamPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-[#2a2b2e] flex items-center justify-center text-white font-bold text-[14px]">
-                    M
+                    {currentUser.workspace ? currentUser.workspace.charAt(0).toUpperCase() : 'M'}
                   </div>
-                  <h2 className="text-[18px] font-bold text-white">My workspace</h2>
+                  <h2 className="text-[18px] font-bold text-white">{currentUser.workspace || 'My workspace'}</h2>
                 </div>
 
                 {isEditingDesc ? (
