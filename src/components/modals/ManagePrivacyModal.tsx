@@ -10,7 +10,7 @@ interface ManagePrivacyModalProps {
 }
 
 export default function ManagePrivacyModal({ isOpen, onClose }: ManagePrivacyModalProps) {
-  const { currentUser } = useApp();
+  const { shareMyTasks, users } = useApp();
   const [teammateInput, setTeammateInput] = useState('');
   const [invitedMembers, setInvitedMembers] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -30,10 +30,17 @@ export default function ManagePrivacyModal({ isOpen, onClose }: ManagePrivacyMod
   };
 
   const handleInvite = () => {
+    const allTargets = [...invitedMembers];
     if (teammateInput.trim()) {
-      handleAddMember(teammateInput.trim());
+      allTargets.push(teammateInput.trim());
     }
-    setToastMessage('Teammates updated for My tasks');
+    allTargets.forEach((entry) => {
+      const emailToShare = entry.includes('@') ? entry : `${entry.toLowerCase().replace(/\s+/g, '.')}@gmail.com`;
+      shareMyTasks(emailToShare);
+    });
+    setInvitedMembers([]);
+    setTeammateInput('');
+    setToastMessage('Teammates granted access to My tasks');
     setTimeout(() => {
       onClose();
     }, 1200);

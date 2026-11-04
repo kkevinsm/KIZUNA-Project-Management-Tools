@@ -5,7 +5,7 @@ import { Menu, Plus, Search, ChevronDown, Sparkles } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 export default function TopNav() {
-  const { toggleSidebar, openCreateModal, searchQuery, setSearchQuery } = useApp();
+  const { toggleSidebar, openCreateModal, searchQuery, setSearchQuery, currentUser } = useApp();
 
   return (
     <header className="h-[48px] min-h-[48px] bg-[#1e1f21] border-b border-[#2b2c2e] px-3.5 flex items-center justify-between z-20 select-none">
@@ -47,7 +47,7 @@ export default function TopNav() {
       {/* Right side: Work with Dash AI button */}
       <div className="flex items-center gap-2">
         <button
-          onClick={() => alert("Dash AI Assistant: How can I help organize your workspace today, Kevin?")}
+          onClick={() => alert(`Dash AI Assistant: How can I help organize your workspace today, ${currentUser.name}?`)}
           className="flex items-center gap-1.5 bg-[#252628] hover:bg-[#2f3033] border border-[#37383b] text-[#f5f4f3] text-[13px] font-medium px-3 py-1.5 rounded-full transition-all"
         >
           {/* Radial multi-color star icon representing Dash AI */}

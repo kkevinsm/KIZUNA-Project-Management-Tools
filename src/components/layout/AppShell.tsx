@@ -13,19 +13,49 @@ import { useApp } from '@/context/AppContext';
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated } = useApp();
+  const { isAuthenticated, isHydrated } = useApp();
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
 
   useEffect(() => {
+    if (!isHydrated) return;
     if (!isAuthenticated && !isAuthPage) {
-      router.push('/login');
+      router.replace('/login');
+    } else if (isAuthenticated && isAuthPage) {
+      router.replace('/');
     }
-  }, [isAuthenticated, isAuthPage, router]);
+  }, [isHydrated, isAuthenticated, isAuthPage, router]);
+
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen w-screen bg-[#1e1f21] flex flex-col items-center justify-center gap-3 text-[#9ca3af] select-none">
+        <div className="flex items-center gap-1.5 animate-pulse">
+          <span className="w-3.5 h-3.5 rounded-full bg-[#f06a6a]"></span>
+          <span className="w-3.5 h-3.5 rounded-full bg-[#f06a6a]"></span>
+          <span className="w-3.5 h-3.5 rounded-full bg-[#f06a6a]"></span>
+        </div>
+        <span className="text-[13px] font-medium text-[#8a8886]">Loading Kizuna...</span>
+      </div>
+    );
+  }
 
   // If on login or signup page, render standalone without shell
   if (isAuthPage) {
     return <main className="min-h-screen bg-[#1e1f21]">{children}</main>;
+  }
+
+  // Block rendering of protected routes when unauthenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen w-screen bg-[#1e1f21] flex flex-col items-center justify-center gap-3 text-[#9ca3af] select-none">
+        <div className="flex items-center gap-1.5 animate-pulse">
+          <span className="w-3.5 h-3.5 rounded-full bg-[#f06a6a]"></span>
+          <span className="w-3.5 h-3.5 rounded-full bg-[#f06a6a]"></span>
+          <span className="w-3.5 h-3.5 rounded-full bg-[#f06a6a]"></span>
+        </div>
+        <span className="text-[13px] font-medium text-[#8a8886]">Redirecting to login...</span>
+      </div>
+    );
   }
 
   return (

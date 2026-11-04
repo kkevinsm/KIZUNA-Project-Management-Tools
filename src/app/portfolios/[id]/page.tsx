@@ -53,6 +53,7 @@ export default function PortfolioDetailPage() {
     currentUser,
     updatePortfolio,
     openCreateModal,
+    sharePortfolio,
   } = useApp();
 
   const portfolio =
@@ -936,7 +937,12 @@ export default function PortfolioDetailPage() {
                   disabled={!shareInviteEmail.trim()}
                   onClick={() => {
                     if (!shareInviteEmail.trim()) return;
-                    setShareToast(`Invited ${shareInviteEmail.trim()} to portfolio`);
+                    const emails = shareInviteEmail
+                      .split(',')
+                      .map((e) => e.trim())
+                      .filter(Boolean);
+                    emails.forEach((em) => sharePortfolio(portfolio.id, em, 'Editor', true));
+                    setShareToast(`Shared portfolio with ${emails.join(', ')}`);
                     setShareInviteEmail('');
                     setTimeout(() => setShareToast(null), 2500);
                   }}
@@ -1031,30 +1037,46 @@ export default function PortfolioDetailPage() {
                   </div>
                 </div>
 
-                {/* Kevin Safrisal */}
-                <div className="flex items-center justify-between py-2 px-1">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-xs"
-                      style={{ backgroundColor: portfolio.owner?.avatarColor || '#d84b7f' }}
-                    >
-                      {portfolio.owner?.initials || currentUser.initials}
-                    </div>
-                    <div>
-                      <div className="text-[13.5px] font-medium text-white">
-                        {portfolio.owner?.name || currentUser.name}
+                {/* Dynamic Portfolio Members with access */}
+                {(portfolio.members && portfolio.members.length > 0
+                  ? portfolio.members
+                  : [
+                      {
+                        name: portfolio.owner?.name || currentUser.name,
+                        initials: portfolio.owner?.initials || currentUser.initials,
+                        avatarColor: portfolio.owner?.avatarColor || '#d84b7f',
+                        email: portfolio.owner?.email || currentUser.email,
+                        role: 'Portfolio admin',
+                      },
+                    ]
+                ).map((member, idx) => (
+                  <div
+                    key={`${member.email || member.name}-${idx}`}
+                    className="flex items-center justify-between py-2 px-1"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-xs shrink-0"
+                        style={{ backgroundColor: member.avatarColor || '#d84b7f' }}
+                      >
+                        {member.initials}
                       </div>
-                      <div className="text-[11.5px] text-[#8a8886]">
-                        kevinsafrisal@gmail.com
+                      <div>
+                        <div className="text-[13.5px] font-medium text-white">
+                          {member.name}
+                        </div>
+                        <div className="text-[11.5px] text-[#8a8886]">
+                          {member.email || (member.name === currentUser.name ? currentUser.email : '')}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-1 text-[13px] text-[#cfcecd] hover:text-white cursor-pointer px-2 py-1 rounded">
-                    <span>Portfolio admin</span>
-                    <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                    <div className="flex items-center gap-1 text-[13px] text-[#cfcecd] hover:text-white cursor-pointer px-2 py-1 rounded">
+                      <span>{member.role || (idx === 0 ? 'Portfolio admin' : 'Editor')}</span>
+                      <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
             </div>
 

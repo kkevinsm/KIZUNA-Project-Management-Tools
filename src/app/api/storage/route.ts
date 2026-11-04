@@ -127,6 +127,51 @@ export async function GET(req: NextRequest) {
   const action = searchParams.get('action');
   const type = searchParams.get('type');
 
+  // Load all database snapshots from Cloudflare R2 in parallel
+  if (action === 'load_all_db') {
+    const types = ['users', 'tasks', 'projects', 'portfolios', 'goals'];
+    const result: Record<string, unknown> = {};
+
+    await Promise.all(
+      types.map(async (t) => {
+        const dbKey = `kizuna/database/${t}.json`;
+        if (isR2Configured()) {
+          try {
+            const client = getR2Client();
+            const bucket = process.env.CLOUDFLARE_R2_BUCKET_NAME!;
+            const command = new GetObjectCommand({
+              Bucket: bucket,
+              Key: dbKey,
+            });
+            const response = await client.send(command);
+            const str = await response.Body?.transformToString('utf-8');
+            if (str) {
+              result[t] = JSON.parse(str);
+              return;
+            }
+          } catch {
+            // fallback
+          }
+        }
+        const found = mockFileStore.get(dbKey);
+        if (found) {
+          try {
+            const decoded = Buffer.from(found.data, 'base64').toString('utf-8');
+            result[t] = JSON.parse(decoded);
+          } catch {
+            // ignore
+          }
+        }
+      })
+    );
+
+    return NextResponse.json({
+      success: true,
+      isR2: isR2Configured(),
+      data: result,
+    });
+  }
+
   // Load database snapshot from Cloudflare R2
   if (action === 'load_db') {
     const dbKey = `kizuna/database/${type}.json`;

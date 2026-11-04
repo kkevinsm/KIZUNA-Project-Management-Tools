@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
-import { ArrowRight, AlertCircle, Users } from 'lucide-react';
+import { ArrowRight, AlertCircle, Users, X, Mail, ShieldCheck } from 'lucide-react';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -16,12 +16,17 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState('');
+  const [googleName, setGoogleName] = useState('');
+  const [googleError, setGoogleError] = useState<string | null>(null);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!name.trim()) {
-      setError('Please enter your full name');
+      setError('Masukkan nama lengkap Anda.');
       return;
     }
 
@@ -36,8 +41,17 @@ export default function SignUpPage() {
     }
   };
 
-  const handleGoogleSignUp = () => {
-    loginWithGoogle();
+  const handleGoogleSignUpSubmit = () => {
+    const clean = googleEmail.trim().toLowerCase();
+    if (!clean || !clean.includes('@')) {
+      setGoogleError('Masukkan alamat email Google yang valid (contoh: nama@gmail.com).');
+      return;
+    }
+    loginWithGoogle({
+      name: googleName.trim() || clean.split('@')[0],
+      email: clean,
+    });
+    setShowGoogleModal(false);
     router.push('/');
   };
 
@@ -45,14 +59,14 @@ export default function SignUpPage() {
     <div className="min-h-screen w-full bg-[#1e1f21] flex flex-col justify-between p-6 select-none text-[#f5f4f3]">
       {/* Top Navbar */}
       <div className="flex items-center justify-between max-w-5xl w-full mx-auto">
-        <Link href="/" className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-1">
             <span className="w-3 h-3 rounded-full bg-[#f06a6a]"></span>
             <span className="w-3 h-3 rounded-full bg-[#f06a6a]"></span>
             <span className="w-3 h-3 rounded-full bg-[#f06a6a]"></span>
           </div>
           <span className="font-bold text-[18px] tracking-tight text-white">kizuna</span>
-        </Link>
+        </div>
 
         <div className="text-[13px] text-[#8a8886]">
           Already have an account?{' '}
@@ -70,7 +84,7 @@ export default function SignUpPage() {
           </div>
           <h1 className="text-[26px] font-bold text-white tracking-tight">Create an account</h1>
           <p className="text-[13px] text-[#8a8886] mt-1.5">
-            Sign up to manage projects and collaborate seamlessly
+            Sign up to get your own private Kizuna workspace
           </p>
         </div>
 
@@ -84,7 +98,10 @@ export default function SignUpPage() {
         {/* Continue with Google */}
         <button
           type="button"
-          onClick={handleGoogleSignUp}
+          onClick={() => {
+            setGoogleError(null);
+            setShowGoogleModal(true);
+          }}
           className="w-full bg-[#1e1f21] hover:bg-[#2b2c30] text-white border border-[#37383b] hover:border-[#4f5156] font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-3 transition-all shadow-sm active:scale-[0.99] mb-4 text-[13px]"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -127,7 +144,7 @@ export default function SignUpPage() {
               name="name"
               autoComplete="name"
               required
-              placeholder="e.g. Kevin Safrisal"
+              placeholder="e.g. Budi Santoso"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full bg-[#1e1f21] hover:bg-[#1a1b1d] focus:bg-[#151617] text-white px-3.5 py-2.5 rounded-lg border border-[#37383b] focus:border-[#4573d2] outline-none transition-all"
@@ -136,7 +153,7 @@ export default function SignUpPage() {
 
           <div>
             <label htmlFor="email" className="block text-[#8a8886] font-semibold mb-1.5">
-              Work email address
+              Work or Google email address
             </label>
             <input
               type="email"
@@ -178,11 +195,104 @@ export default function SignUpPage() {
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
+
+        <div className="mt-5 pt-4 border-t border-[#333538] flex items-center gap-2 text-[11px] text-[#8a8886]">
+          <ShieldCheck className="w-4 h-4 text-[#4cd195] shrink-0" />
+          <span>
+            Akun baru memiliki isi Kizuna pribadi yang terisolasi dan aman.
+          </span>
+        </div>
       </div>
 
       <div className="text-center text-[12px] text-[#6d6c6e]">
-        Kizuna Project Management • Seamless Asana workflow for you and your team
+        Kizuna Project Management • Secure Multi-Tenant Workspace powered by Cloudflare R2
       </div>
+
+      {/* Google Sign-Up Modal */}
+      {showGoogleModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#252628] border border-[#37383b] rounded-2xl p-6 max-w-md w-full shadow-2xl text-[13px] animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between mb-4 border-b border-[#333538] pb-3">
+              <div className="flex items-center gap-2.5">
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.13C3.26 21.36 7.33 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.57H1.26C.46 8.17 0 9.99 0 12s.46 3.83 1.26 5.43l4.02-3.14z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.26 6.57l4.02 3.14c.95-2.83 3.6-4.96 6.72-4.96z"
+                  />
+                </svg>
+                <div>
+                  <h2 className="text-[15px] font-bold text-white">Sign up with Google</h2>
+                  <p className="text-[11px] text-[#8a8886]">Enter your Google Mail to create your Kizuna account</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowGoogleModal(false)}
+                className="p-1 rounded-lg hover:bg-[#333538] text-[#8a8886] hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {googleError && (
+              <div className="mb-3 p-2.5 bg-[#47181c] border border-[#612127] rounded-lg flex items-center gap-2 text-[12px] text-[#ff6b72]">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{googleError}</span>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[12px] text-[#8a8886] font-medium mb-1">
+                  Google Mail Address
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-[#8a8886] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    placeholder="nama.anda@gmail.com"
+                    value={googleEmail}
+                    onChange={(e) => setGoogleEmail(e.target.value)}
+                    className="w-full bg-[#1e1f21] text-white text-[13px] pl-9 pr-3 py-2 rounded-lg border border-[#37383b] focus:border-[#4573d2] outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#8a8886] font-medium mb-1">
+                  Display Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nama Lengkap Anda"
+                  value={googleName}
+                  onChange={(e) => setGoogleName(e.target.value)}
+                  className="w-full bg-[#1e1f21] text-white text-[13px] px-3 py-2 rounded-lg border border-[#37383b] focus:border-[#4573d2] outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={!googleEmail.trim()}
+                onClick={handleGoogleSignUpSubmit}
+                className="w-full bg-[#4573d2] hover:bg-[#3562be] disabled:opacity-40 text-white text-[13px] py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                <span>Continue with Google</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

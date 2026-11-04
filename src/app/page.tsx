@@ -182,7 +182,7 @@ export default function HomePage() {
 
           <div className="flex items-center gap-1.5">
             <Users className="w-4 h-4 text-[#8a8886]" />
-            <span>0 collaborators</span>
+            <span>{Math.max(0, users.length - 1)} collaborators</span>
           </div>
 
           <button

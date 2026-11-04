@@ -57,6 +57,7 @@ export default function ProjectDetailPage() {
     createTask,
     viewConfigs,
     openTaskDrawer,
+    shareProject,
   } = useApp();
 
   const project = projects.find((p) => p.id === projectId) || projects[0];
@@ -803,7 +804,12 @@ export default function ProjectDetailPage() {
                   disabled={!shareInviteEmail.trim()}
                   onClick={() => {
                     if (!shareInviteEmail.trim()) return;
-                    setShareToast(`Invited ${shareInviteEmail.trim()} to project`);
+                    const emails = shareInviteEmail
+                      .split(',')
+                      .map((e) => e.trim())
+                      .filter(Boolean);
+                    emails.forEach((em) => shareProject(project.id, em, 'Editor'));
+                    setShareToast(`Shared project with ${emails.join(', ')}`);
                     setShareInviteEmail('');
                     setTimeout(() => setShareToast(null), 2500);
                   }}
@@ -879,25 +885,43 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
-              {/* Current User row */}
-              <div className="flex items-center justify-between p-2 rounded-xl hover:bg-[#252628] transition-colors">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-bold"
-                    style={{ backgroundColor: currentUser.avatarColor }}
-                  >
-                    {currentUser.initials}
+              {/* Dynamic Project Members with access */}
+              {(project.members && project.members.length > 0
+                ? project.members
+                : [
+                    {
+                      name: currentUser.name,
+                      initials: currentUser.initials,
+                      avatarColor: currentUser.avatarColor,
+                      email: currentUser.email,
+                      role: 'Project admin',
+                    },
+                  ]
+              ).map((member, idx) => (
+                <div
+                  key={`${member.email || member.name}-${idx}`}
+                  className="flex items-center justify-between p-2 rounded-xl hover:bg-[#252628] transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-bold shrink-0"
+                      style={{ backgroundColor: member.avatarColor || '#d84b7f' }}
+                    >
+                      {member.initials}
+                    </div>
+                    <div>
+                      <div className="text-[13px] font-medium text-white">{member.name}</div>
+                      <div className="text-[11.5px] text-[#8a8886]">
+                        {member.email || (member.name === currentUser.name ? currentUser.email : '')}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-[13px] font-medium text-white">{currentUser.name}</div>
-                    <div className="text-[11.5px] text-[#8a8886]">{currentUser.email}</div>
+                  <div className="flex items-center gap-1 text-[12.5px] text-[#cfcecd]">
+                    <span>{member.role || (idx === 0 ? 'Project admin' : 'Editor')}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
                   </div>
                 </div>
-                <div className="flex items-center gap-1 text-[12.5px] text-[#cfcecd]">
-                  <span>Project admin</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
-                </div>
-              </div>
+              ))}
             </div>
 
             {/* Bottom Footer: Copy Project link */}

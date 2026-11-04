@@ -17,12 +17,16 @@ export interface UserAccount {
   pronouns?: string;
   isOutOfOffice?: boolean;
   outOfOfficeNote?: string;
+  collaboratorEmails?: string[];
+  sharedTaskAccessEmails?: string[];
 }
 
 export interface Goal {
   id: string;
   title: string;
-  owner: { name: string; initials: string; avatarColor: string };
+  owner: { name: string; initials: string; avatarColor: string; email?: string };
+  ownerEmail?: string;
+  sharedWithEmails?: string[];
   members?: { name: string; email: string }[];
   timePeriod: string;
   privacy: string;
@@ -34,7 +38,9 @@ export interface Goal {
 export interface TeamMessage {
   id: string;
   title: string;
-  author: { name: string; initials: string; avatarColor: string };
+  author: { name: string; initials: string; avatarColor: string; email?: string };
+  ownerEmail?: string;
+  sharedWithEmails?: string[];
   content: string;
   createdAt: string;
   likes: number;
@@ -45,6 +51,8 @@ export interface Assignee {
   name: string;
   initials: string;
   avatarColor?: string;
+  email?: string;
+  role?: string;
   isPlaceholder?: boolean;
 }
 
@@ -79,6 +87,9 @@ export interface Task {
   myTasksSection?: string; // 'Recently assigned' | 'Do today' | 'Do next week' | 'Do later'
   projectId?: string;
   projectName?: string;
+  ownerEmail?: string;
+  assigneeEmail?: string;
+  sharedWithEmails?: string[];
   assignee: Assignee;
   dueDate: string;
   dueDateRaw?: string; // ISO format or relative
@@ -118,8 +129,11 @@ export interface Project {
   name: string;
   joined: boolean;
   status?: string;
+  ownerEmail?: string;
+  memberEmails?: string[];
   members: Assignee[];
   portfolios: string[];
+  dueDateRange?: string;
   lastModified: string;
   description?: string;
   sections: string[];
@@ -135,6 +149,8 @@ export interface Portfolio {
     updatedAt: string;
     author: string;
   };
+  ownerEmail?: string;
+  memberEmails?: string[];
   owner: Assignee;
   members: Assignee[];
   projectIds: string[];

@@ -80,6 +80,7 @@ export default function PortfoliosBrowsePage() {
     deletePortfolio,
     currentUser,
     projects,
+    sharePortfolio,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'recent' | 'all'>('recent');
@@ -1267,7 +1268,12 @@ export default function PortfoliosBrowsePage() {
                   disabled={!shareInviteEmail.trim()}
                   onClick={() => {
                     if (!shareInviteEmail.trim()) return;
-                    setToastMessage(`Invited ${shareInviteEmail.trim()} to portfolio`);
+                    const emails = shareInviteEmail
+                      .split(',')
+                      .map((e) => e.trim())
+                      .filter(Boolean);
+                    emails.forEach((em) => sharePortfolio(sharingPortfolio.id, em, shareInviteRole, true));
+                    setToastMessage(`Shared portfolio with ${emails.join(', ')}`);
                     setShareInviteEmail('');
                   }}
                   className={`px-4 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
@@ -1361,30 +1367,50 @@ export default function PortfoliosBrowsePage() {
                   </div>
                 </div>
 
-                {/* Kevin Safrisal */}
-                <div className="flex items-center justify-between py-2 px-1">
-                  <div className="flex items-center gap-3">
+                {/* Dynamic Portfolio Members */}
+                {(() => {
+                  const livePort = portfolios.find((p) => p.id === sharingPortfolio.id) || sharingPortfolio;
+                  const memberList =
+                    livePort.members && livePort.members.length > 0
+                      ? livePort.members
+                      : [
+                          {
+                            name: livePort.owner?.name || currentUser.name,
+                            initials: livePort.owner?.initials || currentUser.initials,
+                            avatarColor: livePort.owner?.avatarColor || '#d84b7f',
+                            email: livePort.owner?.email || currentUser.email,
+                            role: 'Portfolio admin',
+                          },
+                        ];
+                  return memberList.map((member, idx) => (
                     <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-xs"
-                      style={{ backgroundColor: sharingPortfolio.owner?.avatarColor || '#d84b7f' }}
+                      key={`${member.email || member.name}-${idx}`}
+                      className="flex items-center justify-between py-2 px-1"
                     >
-                      {sharingPortfolio.owner?.initials || 'KS'}
-                    </div>
-                    <div>
-                      <div className="text-[13.5px] font-medium text-white">
-                        {sharingPortfolio.owner?.name || currentUser.name}
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-xs shrink-0"
+                          style={{ backgroundColor: member.avatarColor || '#d84b7f' }}
+                        >
+                          {member.initials}
+                        </div>
+                        <div>
+                          <div className="text-[13.5px] font-medium text-white">
+                            {member.name}
+                          </div>
+                          <div className="text-[11.5px] text-[#8a8886]">
+                            {member.email || (member.name === currentUser.name ? currentUser.email : '')}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[11.5px] text-[#8a8886]">
-                        kevinsafrisal@gmail.com
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-1 text-[13px] text-[#cfcecd] hover:text-white cursor-pointer px-2 py-1 rounded">
-                    <span>Portfolio admin</span>
-                    <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
-                  </div>
-                </div>
+                      <div className="flex items-center gap-1 text-[13px] text-[#cfcecd] hover:text-white cursor-pointer px-2 py-1 rounded">
+                        <span>{member.role || (idx === 0 ? 'Portfolio admin' : 'Editor')}</span>
+                        <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
 
