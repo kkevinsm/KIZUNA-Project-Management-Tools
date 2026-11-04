@@ -43,6 +43,7 @@ import TaskTimeline from '@/components/tasks/TaskTimeline';
 import ListOptionsDrawer from '@/components/tasks/ListOptionsDrawer';
 import CustomizeDrawer from '@/components/layout/CustomizeDrawer';
 import ExploreProjectBar from '@/components/modals/ExploreProjectBar';
+import EditFieldModal from '@/components/modals/EditFieldModal';
 import { StatusLevel, PriorityLevel } from '@/lib/types';
 
 export default function ProjectDetailPage() {
@@ -62,7 +63,14 @@ export default function ProjectDetailPage() {
     shareProject,
     updateProjectMemberRole,
     removeProjectMember,
+    statusOptions,
+    priorityOptions,
+    updateStatusOptions,
+    updatePriorityOptions,
   } = useApp();
+
+  const [isEditFieldModalOpen, setIsEditFieldModalOpen] = useState(false);
+  const [editFieldType, setEditFieldType] = useState<'Status' | 'Priority'>('Status');
 
   const project = projects.find((p) => p.id === projectId) || projects[0];
 
@@ -440,8 +448,16 @@ export default function ProjectDetailPage() {
                               key={t.id}
                               task={t}
                               showProjectColumn={false}
+                              showVisibilityColumn={false}
+                              showCollaboratorsColumn={false}
+                              showAssigneeColumn={listColumns.assignee}
                               showDueDateColumn={listColumns.dueDate}
-                              showCollaboratorsColumn={listColumns.assignee}
+                              showPriorityColumn={listColumns.priority}
+                              showStatusColumn={listColumns.status}
+                              onOpenEditField={(fieldType) => {
+                                setEditFieldType(fieldType);
+                                setIsEditFieldModalOpen(true);
+                              }}
                             />
                           ))}
 
@@ -1323,6 +1339,23 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Edit Field Modal (Single-select Status/Priority options matching Asana screenshots) */}
+      <EditFieldModal
+        isOpen={isEditFieldModalOpen}
+        onClose={() => setIsEditFieldModalOpen(false)}
+        fieldType={editFieldType}
+        initialOptions={editFieldType === 'Status' ? statusOptions : priorityOptions}
+        onSave={(title, newOptions) => {
+          if (editFieldType === 'Status') {
+            updateStatusOptions(newOptions);
+          } else {
+            updatePriorityOptions(newOptions);
+          }
+          setShareToast(`${title} options saved`);
+          setTimeout(() => setShareToast(null), 2500);
+        }}
+      />
 
       {/* Toast Notification */}
       {shareToast && (

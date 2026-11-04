@@ -102,6 +102,11 @@ interface AppContextType {
   allUsers: UserAccount[];
   updateUserAccount: (userId: string, data: Partial<UserAccount>) => void;
   updateWorkspaceName: (name: string) => void;
+  statusOptions: { id: string; name: string; color: string; textColor?: string }[];
+  priorityOptions: { id: string; name: string; color: string; textColor?: string }[];
+  updateStatusOptions: (options: { id: string; name: string; color: string; textColor?: string }[]) => void;
+  updatePriorityOptions: (options: { id: string; name: string; color: string; textColor?: string }[]) => void;
+  autoFillTaskStatus: (taskId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -336,6 +341,73 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Status & Priority Select Field Options (Matching Asana UI/UX)
+  const [statusOptions, setStatusOptions] = useState<
+    { id: string; name: string; color: string; textColor?: string }[]
+  >([
+    { id: 'on-track', name: 'On track', color: '#79e2c6', textColor: '#0c392b' },
+    { id: 'at-risk', name: 'At risk', color: '#fed648', textColor: '#473b00' },
+    { id: 'off-track', name: 'Off track', color: '#fd8374', textColor: '#4a1813' },
+  ]);
+
+  const [priorityOptions, setPriorityOptions] = useState<
+    { id: string; name: string; color: string; textColor?: string }[]
+  >([
+    { id: 'low', name: 'Low', color: '#79e2c6', textColor: '#0c392b' },
+    { id: 'medium', name: 'Medium', color: '#fec156', textColor: '#472d00' },
+    { id: 'high', name: 'High', color: '#de9bf6', textColor: '#3e134f' },
+  ]);
+
+  const updateStatusOptions = useCallback(
+    (opts: { id: string; name: string; color: string; textColor?: string }[]) => {
+      setStatusOptions(opts);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('kizuna_status_options', JSON.stringify(opts));
+      }
+    },
+    []
+  );
+
+  const updatePriorityOptions = useCallback(
+    (opts: { id: string; name: string; color: string; textColor?: string }[]) => {
+      setPriorityOptions(opts);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('kizuna_priority_options', JSON.stringify(opts));
+      }
+    },
+    []
+  );
+
+  const autoFillTaskStatus = useCallback((taskId: string) => {
+    setAllTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t;
+        let newStatus: any = 'On track';
+        const due = (t.dueDate || '').toLowerCase();
+        if (t.completed) {
+          newStatus = 'Complete';
+        } else if (
+          due.includes('yesterday') ||
+          due.includes('nov 1') ||
+          due.includes('nov 2') ||
+          due.includes('overdue')
+        ) {
+          newStatus = 'Off track';
+        } else if (
+          due.includes('today') ||
+          due.includes('nov 3') ||
+          due.includes('nov 4') ||
+          due.includes('nov 5')
+        ) {
+          newStatus = 'At risk';
+        } else {
+          newStatus = 'On track';
+        }
+        return { ...t, status: newStatus };
+      })
+    );
+  }, []);
+
   // Sync snapshot to Cloudflare R2
   const syncToCloudflareR2 = useCallback(
     async (type: 'users' | 'tasks' | 'projects' | 'portfolios' | 'goals', data: unknown) => {
@@ -424,6 +496,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const rawViewConfigs = localStorage.getItem('kizuna_view_configs');
         const rawTeamDesc = localStorage.getItem('kizuna_team_desc');
         const rawMessages = localStorage.getItem('kizuna_team_messages');
+        const rawStatusOpts = localStorage.getItem('kizuna_status_options');
+        const rawPriorityOpts = localStorage.getItem('kizuna_priority_options');
+
+        if (rawStatusOpts) {
+          try {
+            setStatusOptions(JSON.parse(rawStatusOpts));
+          } catch {}
+        }
+        if (rawPriorityOpts) {
+          try {
+            setPriorityOptions(JSON.parse(rawPriorityOpts));
+          } catch {}
+        }
 
         if (rawViewConfigs) {
           try {
@@ -1929,6 +2014,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         allUsers,
         updateUserAccount,
         updateWorkspaceName,
+        statusOptions,
+        priorityOptions,
+        updateStatusOptions,
+        updatePriorityOptions,
+        autoFillTaskStatus,
       }}
     >
       {children}

@@ -44,6 +44,7 @@ import TaskRow from '@/components/tasks/TaskRow';
 import ListOptionsDrawer from '@/components/tasks/ListOptionsDrawer';
 import AddTaskSplitButton from '@/components/tasks/AddTaskSplitButton';
 import FilterPopoverContent, { FilterRule, evaluateTaskFilters } from '@/components/tasks/FilterPopoverContent';
+import EditFieldModal from '@/components/modals/EditFieldModal';
 import { Task, PriorityLevel, CustomColumn } from '@/lib/types';
 
 interface TaskListProps {
@@ -60,7 +61,14 @@ export default function TaskList({
     updateTask,
     deleteTask,
     openTaskDrawer,
+    statusOptions,
+    priorityOptions,
+    updateStatusOptions,
+    updatePriorityOptions,
   } = useApp();
+
+  const [isEditFieldModalOpen, setIsEditFieldModalOpen] = useState(false);
+  const [editFieldType, setEditFieldType] = useState<'Status' | 'Priority'>('Status');
 
   // Sections state
   const [sections, setSections] = useState<string[]>(initialSections);
@@ -156,6 +164,7 @@ export default function TaskList({
     project: true,
     visibility: true,
     priority: true,
+    status: true,
     createdBy: false,
     createdOn: false,
     lastModifiedOn: false,
@@ -1035,6 +1044,18 @@ export default function TaskList({
               </div>
             )}
 
+            {columns.priority && (
+              <div className="w-[110px] shrink-0 px-2 flex items-center h-full font-medium text-[12px] text-white">
+                Priority
+              </div>
+            )}
+
+            {columns.status && (
+              <div className="w-[110px] shrink-0 px-2 flex items-center h-full font-medium text-[12px] text-white">
+                Status
+              </div>
+            )}
+
             {/* Dynamic Custom Column Headers */}
             {customColumns.map((col) => (
               <div
@@ -1254,12 +1275,18 @@ export default function TaskList({
                           showDueDateColumn={columns.dueDate}
                           showVisibilityColumn={columns.visibility}
                           showCollaboratorsColumn={columns.collaborators}
+                          showPriorityColumn={columns.priority}
+                          showStatusColumn={columns.status}
                           customColumns={customColumns}
                           onUpdateCustomField={(taskId, fieldId, value) => {
                             const cur = task.customFields || {};
                             updateTask(taskId, { customFields: { ...cur, [fieldId]: value } });
                           }}
                           onMoveSection={(sec) => updateTask(task.id, { myTasksSection: sec })}
+                          onOpenEditField={(fieldType) => {
+                            setEditFieldType(fieldType);
+                            setIsEditFieldModalOpen(true);
+                          }}
                         />
                       ))}
 
@@ -1464,6 +1491,21 @@ export default function TaskList({
           </button>
         </div>
       )}
+
+      {/* Edit Field Modal for Single-select Status and Priority */}
+      <EditFieldModal
+        isOpen={isEditFieldModalOpen}
+        onClose={() => setIsEditFieldModalOpen(false)}
+        fieldType={editFieldType}
+        initialOptions={editFieldType === 'Status' ? statusOptions : priorityOptions}
+        onSave={(_, newOptions) => {
+          if (editFieldType === 'Status') {
+            updateStatusOptions(newOptions);
+          } else {
+            updatePriorityOptions(newOptions);
+          }
+        }}
+      />
 
       {/* Right-side List Options Drawer */}
       <ListOptionsDrawer
