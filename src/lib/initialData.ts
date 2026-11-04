@@ -65,14 +65,16 @@ export const INITIAL_PORTFOLIOS: Portfolio[] = [
     dueDateRange: 'Nov 3 – Dec 1',
     isStarred: false,
     color: '#dedcd8',
+    joined: true,
+    lastModified: '2026-11-03T11:18:00.000Z',
   },
   {
-    id: 'product-roadmap',
-    name: 'Product roadmap',
+    id: 'example',
+    name: 'example',
     status: 'On track',
     statusUpdate: {
-      title: 'Roadmap execution is on track',
-      summary: 'Q4 milestones and key release targets remain on schedule across engineering teams.',
+      title: 'This portfolio of work is on track!',
+      summary: 'Ongoing initiatives are proceeding on schedule.',
       updatedAt: '2 days ago',
       author: 'Kevin Safrisal',
     },
@@ -92,8 +94,10 @@ export const INITIAL_PORTFOLIOS: Portfolio[] = [
     defaultView: 'List',
     privacy: 'Public to My workspace',
     dueDateRange: 'Oct 15 – Dec 30',
-    isStarred: true,
+    isStarred: false,
     color: '#d472d4',
+    joined: true,
+    lastModified: '2026-11-04T08:30:00.000Z',
   },
 ];
 

@@ -115,4 +115,7 @@ export interface Portfolio {
   dueDateRange?: string;
   isStarred?: boolean;
   color?: string;
+  joined?: boolean;
+  parentPortfolio?: string;
+  lastModified?: string;
 }

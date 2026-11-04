@@ -27,6 +27,8 @@ import {
   Pencil,
   Link as LinkIcon,
   Trash2,
+  SlidersHorizontal,
+  ArrowUpDown,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Portfolio } from '@/lib/types';
@@ -81,6 +83,14 @@ export default function PortfoliosBrowsePage() {
   const [activeTab, setActiveTab] = useState<'recent' | 'all'>('recent');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+  // Filter, Sort, & Search state matching Asana screenshot
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filterMembership, setFilterMembership] = useState<'all' | 'joined' | 'owned' | 'starred'>('all');
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<'last_modified_newest' | 'last_modified_oldest' | 'alpha_asc' | 'alpha_desc'>('last_modified_newest');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Context menu & action states matching Asana
   const [activeMenuPortfolioId, setActiveMenuPortfolioId] = useState<string | null>(null);
   const [showColorSubmenu, setShowColorSubmenu] = useState<string | null>(null);
@@ -107,6 +117,12 @@ export default function PortfoliosBrowsePage() {
       if (!target.closest('[data-portfolio-menu]')) {
         setActiveMenuPortfolioId(null);
         setShowColorSubmenu(null);
+      }
+      if (!target.closest('[data-filter-popover]')) {
+        setIsFilterOpen(false);
+      }
+      if (!target.closest('[data-sort-popover]')) {
+        setIsSortOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -167,37 +183,214 @@ export default function PortfoliosBrowsePage() {
     }
   };
 
-  // Filter or sort portfolios according to tab
-  const displayedPortfolios = useMemo(() => {
-    if (activeTab === 'all') {
-      return portfolios;
+  // Get sort label for button
+  const sortLabel = useMemo(() => {
+    switch (sortBy) {
+      case 'last_modified_newest':
+        return 'Last modified (Newest)';
+      case 'last_modified_oldest':
+        return 'Last modified (Oldest)';
+      case 'alpha_asc':
+        return 'Alphabetical (A - Z)';
+      case 'alpha_desc':
+        return 'Alphabetical (Z - A)';
+      default:
+        return 'Last modified (Newest)';
     }
-    return [...portfolios].sort((a, b) => {
-      if (a.isStarred && !b.isStarred) return -1;
-      if (!a.isStarred && b.isStarred) return 1;
-      return 0;
+  }, [sortBy]);
+
+  // Filter and sort portfolios
+  const displayedPortfolios = useMemo(() => {
+    let list = [...portfolios];
+
+    // Search query filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter((p) => p.name.toLowerCase().includes(q));
+    }
+
+    // Membership / Starred filter
+    if (filterMembership === 'joined') {
+      list = list.filter((p) => p.joined !== false);
+    } else if (filterMembership === 'owned') {
+      list = list.filter((p) => p.owner?.name === currentUser.name);
+    } else if (filterMembership === 'starred') {
+      list = list.filter((p) => p.isStarred);
+    }
+
+    // Sort order
+    list.sort((a, b) => {
+      if (sortBy === 'alpha_asc') {
+        return a.name.localeCompare(b.name);
+      }
+      if (sortBy === 'alpha_desc') {
+        return b.name.localeCompare(a.name);
+      }
+      if (sortBy === 'last_modified_oldest') {
+        const timeA = a.lastModified ? new Date(a.lastModified).getTime() : 0;
+        const timeB = b.lastModified ? new Date(b.lastModified).getTime() : 0;
+        return timeA - timeB;
+      }
+      // default: last_modified_newest
+      const timeA = a.lastModified ? new Date(a.lastModified).getTime() : 0;
+      const timeB = b.lastModified ? new Date(b.lastModified).getTime() : 0;
+      return timeB - timeA;
     });
-  }, [portfolios, activeTab]);
+
+    return list;
+  }, [portfolios, searchQuery, filterMembership, sortBy, currentUser]);
 
   return (
     <div className="flex-1 bg-[#1e1f21] min-h-screen text-[#f5f4f3] select-none flex flex-col">
       <div className="p-8 max-w-[1240px] w-full mx-auto space-y-6 flex-1">
-        {/* Header (matching Asana screenshot) */}
+        {/* Header (matching Asana screenshot media_1793763170041_8ba5eca3.png) */}
         <div className="flex items-center justify-between">
-          <h1 className="text-[26px] font-bold text-white tracking-tight">Portfolios</h1>
-          <button
-            onClick={handleOpenWizard}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#37383b] bg-[#252628] hover:bg-[#2e3034] text-white text-[13px] font-medium transition-colors cursor-pointer shadow-xs"
-          >
-            <span>Create portfolio</span>
-          </button>
+          <h1 className="text-[20px] font-bold text-white tracking-tight">Portfolios</h1>
+
+          {/* Top Actions: Filter, Sort, Search, Create portfolio */}
+          <div className="flex items-center gap-3">
+            {/* Filter Dropdown */}
+            <div className="relative" data-filter-popover>
+              <button
+                onClick={() => {
+                  setIsFilterOpen(!isFilterOpen);
+                  setIsSortOpen(false);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer ${
+                  filterMembership !== 'all' || isFilterOpen
+                    ? 'bg-[#28292c] text-white'
+                    : 'text-[#8a8886] hover:text-white hover:bg-[#252628]'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Filter</span>
+                {filterMembership !== 'all' && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#4573d2]" />
+                )}
+              </button>
+
+              {isFilterOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-48 bg-[#1e1f21] border border-[#38393c] rounded-xl shadow-2xl py-1.5 z-50 text-[13px] animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider">
+                    Show portfolios
+                  </div>
+                  {[
+                    { key: 'all', label: 'All portfolios' },
+                    { key: 'joined', label: 'Joined portfolios' },
+                    { key: 'owned', label: 'Owned by me' },
+                    { key: 'starred', label: 'Starred' },
+                  ].map((f) => (
+                    <button
+                      key={f.key}
+                      onClick={() => {
+                        setFilterMembership(f.key as any);
+                        setIsFilterOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-1.5 text-left text-[#cfcecd] hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                    >
+                      <span>{f.label}</span>
+                      {filterMembership === f.key && (
+                        <Check className="w-3.5 h-3.5 text-[#4573d2]" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="relative" data-sort-popover>
+              <button
+                onClick={() => {
+                  setIsSortOpen(!isSortOpen);
+                  setIsFilterOpen(false);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer ${
+                  isSortOpen ? 'bg-[#28292c] text-white' : 'text-[#8a8886] hover:text-white hover:bg-[#252628]'
+                }`}
+              >
+                <ArrowUpDown className="w-3.5 h-3.5" />
+                <span>Sort: {sortLabel}</span>
+              </button>
+
+              {isSortOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-56 bg-[#1e1f21] border border-[#38393c] rounded-xl shadow-2xl py-1.5 z-50 text-[13px] animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider">
+                    Sort by
+                  </div>
+                  {[
+                    { key: 'last_modified_newest', label: 'Last modified (Newest)' },
+                    { key: 'last_modified_oldest', label: 'Last modified (Oldest)' },
+                    { key: 'alpha_asc', label: 'Alphabetical (A - Z)' },
+                    { key: 'alpha_desc', label: 'Alphabetical (Z - A)' },
+                  ].map((s) => (
+                    <button
+                      key={s.key}
+                      onClick={() => {
+                        setSortBy(s.key as any);
+                        setIsSortOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-1.5 text-left text-[#cfcecd] hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                    >
+                      <span>{s.label}</span>
+                      {sortBy === s.key && (
+                        <Check className="w-3.5 h-3.5 text-[#4573d2]" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Search Input / Icon */}
+            <div className="relative flex items-center">
+              {isSearchOpen ? (
+                <div className="flex items-center gap-1.5 bg-[#141517] border border-[#37383b] rounded-lg px-2.5 py-1 text-[13px] text-white animate-in fade-in duration-100">
+                  <Search className="w-3.5 h-3.5 text-[#8a8886]" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Find a portfolio..."
+                    autoFocus
+                    className="bg-transparent focus:outline-none text-[13px] text-white placeholder-[#8a8886] w-36"
+                  />
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setIsSearchOpen(false);
+                    }}
+                    className="text-[#8a8886] hover:text-white p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsSearchOpen(true)}
+                  className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#252628] transition-colors cursor-pointer"
+                  title="Search portfolios"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Create Portfolio Button */}
+            <button
+              onClick={handleOpenWizard}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#37383b] bg-[#252628] hover:bg-[#2e3034] text-white text-[13px] font-medium transition-colors cursor-pointer shadow-xs"
+            >
+              <span>Create portfolio</span>
+            </button>
+          </div>
         </div>
 
-        {/* Navigation Tabs (Recent and starred / Browse all) - Matching Asana pill button */}
+        {/* Navigation Tabs (Recent and starred / Browse all) - Exact Blue Pill on Active Tab */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('recent')}
-            className={`px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors cursor-pointer ${
+            className={`px-3 py-1 rounded-full text-[13px] font-medium transition-colors cursor-pointer ${
               activeTab === 'recent'
                 ? 'bg-[#1e468f] text-white shadow-xs'
                 : 'text-[#8a8886] hover:text-white'
@@ -208,7 +401,7 @@ export default function PortfoliosBrowsePage() {
 
           <button
             onClick={() => setActiveTab('all')}
-            className={`px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors cursor-pointer ${
+            className={`px-3.5 py-1 rounded-full text-[13px] font-medium transition-colors cursor-pointer ${
               activeTab === 'all'
                 ? 'bg-[#1e468f] text-white shadow-xs'
                 : 'text-[#8a8886] hover:text-white'
@@ -218,299 +411,541 @@ export default function PortfoliosBrowsePage() {
           </button>
         </div>
 
-        {/* Section Header with Horizontal Rule (matching Asana screenshot) */}
-        <div className="flex items-center justify-between pt-2 pb-2 border-b border-[#2e2f32]">
-          <div className="flex items-center gap-1.5 text-[14px] font-semibold text-white cursor-pointer hover:text-[#dedcd8]">
-            <ChevronDown className="w-4 h-4 text-[#8a8886]" />
-            <span>Recent portfolios</span>
-          </div>
-
-          {/* Grid / List switcher */}
-          <div className="flex items-center gap-1 text-[#8a8886]">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-1 rounded hover:bg-[#2a2b2e] ${
-                viewMode === 'grid' ? 'text-white' : 'text-[#8a8886]'
-              }`}
-              title="Grid view"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-1 rounded hover:bg-[#2a2b2e] ${
-                viewMode === 'list' ? 'text-white' : 'text-[#8a8886]'
-              }`}
-              title="List view"
-            >
-              <ListIcon className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Portfolios Cards Grid (matching Asana screenshot) */}
-        {viewMode === 'grid' ? (
-          <div className="flex flex-wrap items-start gap-4 pt-2">
-            {/* 1. New Portfolio Dashed Card */}
-            <div
-              onClick={handleOpenWizard}
-              className="flex flex-col group cursor-pointer w-[142px]"
-            >
-              <div className="h-[136px] w-[136px] mx-auto rounded-2xl border border-dashed border-[#3a3b3e] group-hover:border-[#4573d2] flex items-center justify-center transition-colors bg-transparent">
-                <Plus className="w-7 h-7 text-[#8a8886] group-hover:text-white transition-colors" />
+        {/* ============================================================== */}
+        {/* TAB 1: Recent and starred (Grid cards)                         */}
+        {/* ============================================================== */}
+        {activeTab === 'recent' && (
+          <div className="space-y-4">
+            {/* Section Header with Horizontal Rule (matching Asana screenshot) */}
+            <div className="flex items-center justify-between pt-2 pb-2 border-b border-[#2e2f32]">
+              <div className="flex items-center gap-1.5 text-[14px] font-semibold text-white cursor-pointer hover:text-[#dedcd8]">
+                <ChevronDown className="w-4 h-4 text-[#8a8886]" />
+                <span>Recent portfolios</span>
               </div>
-              <span className="text-[13px] font-medium text-[#cfcecd] group-hover:text-white transition-colors text-center mt-2">
-                New portfolio
-              </span>
+
+              {/* Grid / List switcher */}
+              <div className="flex items-center gap-1 text-[#8a8886]">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1 rounded hover:bg-[#2a2b2e] ${
+                    viewMode === 'grid' ? 'text-white' : 'text-[#8a8886]'
+                  }`}
+                  title="Grid view"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-1 rounded hover:bg-[#2a2b2e] ${
+                    viewMode === 'list' ? 'text-white' : 'text-[#8a8886]'
+                  }`}
+                  title="List view"
+                >
+                  <ListIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            {/* 2. Existing Portfolios Cards with Folder Silhouette & Hover Context Menu */}
-            {displayedPortfolios.map((port) => (
-              <div
-                key={port.id}
-                data-portfolio-menu
-                className={`relative flex flex-col group cursor-pointer w-[146px] p-2 rounded-2xl transition-all ${
-                  activeMenuPortfolioId === port.id
-                    ? 'bg-[#28292c] shadow-lg'
-                    : 'hover:bg-[#28292c]/80'
-                }`}
-              >
-                {/* Folder Silhouette Container */}
+            {/* Portfolios Cards Grid */}
+            {viewMode === 'grid' ? (
+              <div className="flex flex-wrap items-start gap-4 pt-2">
+                {/* 1. New Portfolio Dashed Card */}
                 <div
-                  onClick={() => router.push(`/portfolios/${port.id}`)}
-                  className="relative w-[130px] h-[86px] mx-auto select-none"
+                  onClick={handleOpenWizard}
+                  className="flex flex-col group cursor-pointer w-[142px]"
                 >
-                  <AsanaFolderShape
-                    color={port.color || '#dedcd8'}
-                    className="w-full h-full drop-shadow-xs transition-colors"
-                  />
+                  <div className="h-[136px] w-[136px] mx-auto rounded-2xl border border-dashed border-[#3a3b3e] group-hover:border-[#4573d2] flex items-center justify-center transition-colors bg-transparent">
+                    <Plus className="w-7 h-7 text-[#8a8886] group-hover:text-white transition-colors" />
+                  </div>
+                  <span className="text-[13px] font-medium text-[#cfcecd] group-hover:text-white transition-colors text-center mt-2">
+                    New portfolio
+                  </span>
+                </div>
 
-                  {/* Star Button (Top-left on tab) */}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      toggleStarred(port.id);
-                    }}
-                    className={`absolute top-1 left-1.5 z-10 p-1 rounded-md text-[#1e1f21] hover:bg-black/15 transition-all cursor-pointer ${
-                      port.isStarred
-                        ? 'opacity-100 text-[#f5b324]'
-                        : 'opacity-0 group-hover:opacity-70 hover:!opacity-100'
-                    }`}
-                    title={port.isStarred ? 'Remove from starred' : 'Add to starred'}
-                  >
-                    <Star
-                      className={`w-3.5 h-3.5 ${
-                        port.isStarred ? 'fill-[#f5b324] text-[#f5b324]' : 'text-[#1e1f21]'
-                      }`}
-                    />
-                  </button>
-
-                  {/* Three-dots Menu Trigger (Top-right shoulder) */}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setActiveMenuPortfolioId(
-                        activeMenuPortfolioId === port.id ? null : port.id
-                      );
-                    }}
-                    className={`absolute top-4 right-1 z-10 p-1 rounded-md text-[#1e1f21] hover:bg-black/15 transition-all cursor-pointer ${
+                {/* 2. Existing Portfolios Cards with Folder Silhouette & Hover Context Menu */}
+                {displayedPortfolios.map((port) => (
+                  <div
+                    key={port.id}
+                    data-portfolio-menu
+                    className={`relative flex flex-col group cursor-pointer w-[146px] p-2 rounded-2xl transition-all ${
                       activeMenuPortfolioId === port.id
-                        ? 'opacity-100 bg-black/15'
-                        : 'opacity-0 group-hover:opacity-70 hover:!opacity-100'
+                        ? 'bg-[#28292c] shadow-lg'
+                        : 'hover:bg-[#28292c]/80'
                     }`}
-                    title="More actions"
                   >
-                    <MoreHorizontal className="w-3.5 h-3.5" />
-                  </button>
-
-                  {/* Owner Avatar Badge (Overlapping bottom-right corner of folder) */}
-                  <div
-                    className="absolute -bottom-1 -right-1 z-10 w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shadow-md border-2 border-[#1e1f21]"
-                    style={{ backgroundColor: port.owner?.avatarColor || '#d84b7f' }}
-                    title={port.owner?.name || currentUser.name}
-                  >
-                    {port.owner?.initials || 'KS'}
-                  </div>
-                </div>
-
-                {/* Portfolio Title & Subtitle */}
-                <div
-                  onClick={() => router.push(`/portfolios/${port.id}`)}
-                  className="mt-2.5 px-1"
-                >
-                  <div className="text-[13px] font-semibold text-white group-hover:text-[#4573d2] transition-colors truncate">
-                    {port.name}
-                  </div>
-                  <div className="text-[11.5px] text-[#8a8886]">
-                    {port.projectIds?.length || 1} project
-                    {(port.projectIds?.length || 1) === 1 ? '' : 's'}
-                  </div>
-                </div>
-
-                {/* Pop-up Menu matching Asana screenshot exactly */}
-                {activeMenuPortfolioId === port.id && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute top-[48px] left-[70px] z-50 w-[205px] bg-[#1e1f21] border border-[#38393c] rounded-xl shadow-2xl py-1 text-[13px] text-[#cfcecd] animate-in fade-in zoom-in-95 duration-100"
-                  >
-                    {/* Share */}
-                    <button
-                      onClick={() => {
-                        setSharingPortfolio(port);
-                        setActiveMenuPortfolioId(null);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                    {/* Folder Silhouette Container */}
+                    <div
+                      onClick={() => router.push(`/portfolios/${port.id}`)}
+                      className="relative w-[130px] h-[86px] mx-auto select-none"
                     >
-                      <Users className="w-4 h-4 text-[#9c9a99]" />
-                      <span>Share</span>
-                    </button>
-
-                    {/* Add to starred */}
-                    <button
-                      onClick={() => {
-                        toggleStarred(port.id);
-                        setActiveMenuPortfolioId(null);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
-                    >
-                      <Star
-                        className={`w-4 h-4 ${
-                          port.isStarred ? 'fill-[#f5b324] text-[#f5b324]' : 'text-[#9c9a99]'
-                        }`}
+                      <AsanaFolderShape
+                        color={port.color || '#dedcd8'}
+                        className="w-full h-full drop-shadow-xs transition-colors"
                       />
-                      <span>{port.isStarred ? 'Remove from starred' : 'Add to starred'}</span>
-                    </button>
 
-                    {/* Set color > with Flyout Submenu */}
-                    <div className="relative group/color">
+                      {/* Star Button (Top-left on tab) */}
                       <button
-                        onClick={() => {
-                          setShowColorSubmenu(showColorSubmenu === port.id ? null : port.id);
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleStarred(port.id);
                         }}
-                        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                        className={`absolute top-1 left-1.5 z-10 p-1 rounded-md text-[#1e1f21] hover:bg-black/15 transition-all cursor-pointer ${
+                          port.isStarred
+                            ? 'opacity-100 text-[#f5b324]'
+                            : 'opacity-0 group-hover:opacity-70 hover:!opacity-100'
+                        }`}
+                        title={port.isStarred ? 'Remove from starred' : 'Add to starred'}
                       >
-                        <div className="flex items-center gap-2.5">
-                          <span
-                            className="w-3.5 h-3.5 rounded-[3px] border border-white/20 shrink-0"
-                            style={{ backgroundColor: port.color || '#dedcd8' }}
-                          />
-                          <span>Set color</span>
-                        </div>
-                        <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                        <Star
+                          className={`w-3.5 h-3.5 ${
+                            port.isStarred ? 'fill-[#f5b324] text-[#f5b324]' : 'text-[#1e1f21]'
+                          }`}
+                        />
                       </button>
 
-                      {/* Color Palette Flyout */}
-                      <div className="hidden group-hover/color:block absolute left-[100%] top-0 ml-1 p-2 bg-[#1e1f21] border border-[#38393c] rounded-xl shadow-2xl z-50">
-                        <div className="grid grid-cols-3 gap-1.5 w-[96px]">
-                          {PORTFOLIO_COLORS.map((c) => (
-                            <button
-                              key={c.value}
-                              onClick={() => {
-                                updatePortfolio(port.id, { color: c.value });
-                                setActiveMenuPortfolioId(null);
-                                setShowColorSubmenu(null);
-                                setToastMessage(`Color updated to ${c.name}`);
-                              }}
-                              className={`w-6 h-6 rounded-md hover:scale-110 transition-transform flex items-center justify-center border ${
-                                (port.color || '#dedcd8') === c.value
-                                  ? 'border-white'
-                                  : 'border-transparent'
-                              }`}
-                              style={{ backgroundColor: c.value }}
-                              title={c.name}
-                            >
-                              {(port.color || '#dedcd8') === c.value && (
-                                <Check className="w-3 h-3 text-black stroke-[3]" />
-                              )}
-                            </button>
-                          ))}
+                      {/* Three-dots Menu Trigger (Top-right shoulder) */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setActiveMenuPortfolioId(
+                            activeMenuPortfolioId === port.id ? null : port.id
+                          );
+                        }}
+                        className={`absolute top-4 right-1 z-10 p-1 rounded-md text-[#1e1f21] hover:bg-black/15 transition-all cursor-pointer ${
+                          activeMenuPortfolioId === port.id
+                            ? 'opacity-100 bg-black/15'
+                            : 'opacity-0 group-hover:opacity-70 hover:!opacity-100'
+                        }`}
+                        title="More actions"
+                      >
+                        <MoreHorizontal className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Owner Avatar Badge (Overlapping bottom-right corner of folder) */}
+                      <div
+                        className="absolute -bottom-1 -right-1 z-10 w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shadow-md border-2 border-[#1e1f21]"
+                        style={{ backgroundColor: port.owner?.avatarColor || '#d84b7f' }}
+                        title={port.owner?.name || currentUser.name}
+                      >
+                        {port.owner?.initials || 'KS'}
+                      </div>
+                    </div>
+
+                    {/* Portfolio Title & Subtitle */}
+                    <div
+                      onClick={() => router.push(`/portfolios/${port.id}`)}
+                      className="mt-2.5 px-1"
+                    >
+                      <div className="text-[13px] font-semibold text-white group-hover:text-[#4573d2] transition-colors truncate">
+                        {port.name}
+                      </div>
+                      <div className="text-[11.5px] text-[#8a8886]">
+                        {port.projectIds?.length || 1} project
+                        {(port.projectIds?.length || 1) === 1 ? '' : 's'}
+                      </div>
+                    </div>
+
+                    {/* Pop-up Menu matching Asana screenshot exactly */}
+                    {activeMenuPortfolioId === port.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-[48px] left-[70px] z-50 w-[205px] bg-[#1e1f21] border border-[#38393c] rounded-xl shadow-2xl py-1 text-[13px] text-[#cfcecd] animate-in fade-in zoom-in-95 duration-100"
+                      >
+                        {/* Share */}
+                        <button
+                          onClick={() => {
+                            setSharingPortfolio(port);
+                            setActiveMenuPortfolioId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                        >
+                          <Users className="w-4 h-4 text-[#9c9a99]" />
+                          <span>Share</span>
+                        </button>
+
+                        {/* Add to starred */}
+                        <button
+                          onClick={() => {
+                            toggleStarred(port.id);
+                            setActiveMenuPortfolioId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                        >
+                          <Star
+                            className={`w-4 h-4 ${
+                              port.isStarred ? 'fill-[#f5b324] text-[#f5b324]' : 'text-[#9c9a99]'
+                            }`}
+                          />
+                          <span>{port.isStarred ? 'Remove from starred' : 'Add to starred'}</span>
+                        </button>
+
+                        {/* Set color > with Flyout Submenu */}
+                        <div className="relative group/color">
+                          <button
+                            onClick={() => {
+                              setShowColorSubmenu(showColorSubmenu === port.id ? null : port.id);
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <span
+                                className="w-3.5 h-3.5 rounded-[3px] border border-white/20 shrink-0"
+                                style={{ backgroundColor: port.color || '#dedcd8' }}
+                              />
+                              <span>Set color</span>
+                            </div>
+                            <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                          </button>
+
+                          {/* Color Palette Flyout */}
+                          <div className="hidden group-hover/color:block absolute left-[100%] top-0 ml-1 p-2 bg-[#1e1f21] border border-[#38393c] rounded-xl shadow-2xl z-50">
+                            <div className="grid grid-cols-3 gap-1.5 w-[96px]">
+                              {PORTFOLIO_COLORS.map((c) => (
+                                <button
+                                  key={c.value}
+                                  onClick={() => {
+                                    updatePortfolio(port.id, { color: c.value });
+                                    setActiveMenuPortfolioId(null);
+                                    setShowColorSubmenu(null);
+                                    setToastMessage(`Color updated to ${c.name}`);
+                                  }}
+                                  className={`w-6 h-6 rounded-md hover:scale-110 transition-transform flex items-center justify-center border ${
+                                    (port.color || '#dedcd8') === c.value
+                                      ? 'border-white'
+                                      : 'border-transparent'
+                                  }`}
+                                  style={{ backgroundColor: c.value }}
+                                  title={c.name}
+                                >
+                                  {(port.color || '#dedcd8') === c.value && (
+                                    <Check className="w-3 h-3 text-black stroke-[3]" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Rename portfolio */}
+                        <button
+                          onClick={() => {
+                            setRenamingPortfolio(port);
+                            setRenameValue(port.name);
+                            setActiveMenuPortfolioId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                        >
+                          <Pencil className="w-4 h-4 text-[#9c9a99]" />
+                          <span>Rename portfolio</span>
+                        </button>
+
+                        {/* Copy portfolio link */}
+                        <button
+                          onClick={() => {
+                            const link = `${window.location.origin}/portfolios/${port.id}`;
+                            navigator.clipboard.writeText(link);
+                            setToastMessage('Portfolio link copied to clipboard');
+                            setActiveMenuPortfolioId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                        >
+                          <LinkIcon className="w-4 h-4 text-[#9c9a99]" />
+                          <span>Copy portfolio link</span>
+                        </button>
+
+                        {/* Delete portfolio */}
+                        <div className="my-1 border-t border-[#2e2f32]" />
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete portfolio "${port.name}"?`)) {
+                              deletePortfolio(port.id);
+                              setToastMessage('Portfolio deleted');
+                            }
+                            setActiveMenuPortfolioId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span>Delete portfolio</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* List View in Recent */
+              <div className="divide-y divide-[#252628] border-b border-[#2b2c2e]">
+                {displayedPortfolios.map((port) => (
+                  <Link
+                    key={port.id}
+                    href={`/portfolios/${port.id}`}
+                    className="flex items-center justify-between py-3 px-2 hover:bg-[#252628]/60 rounded-lg group transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-[#1e1f21]"
+                        style={{ backgroundColor: port.color || '#dedcd8' }}
+                      >
+                        <Folder className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-[13.5px] font-medium text-white group-hover:text-[#4573d2]">
+                          {port.name}
+                        </div>
+                        <div className="text-[11.5px] text-[#8a8886]">
+                          {port.projectIds?.length || 1} project • {port.privacy}
                         </div>
                       </div>
                     </div>
 
-                    {/* Rename portfolio */}
-                    <button
-                      onClick={() => {
-                        setRenamingPortfolio(port);
-                        setRenameValue(port.name);
-                        setActiveMenuPortfolioId(null);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
-                    >
-                      <Pencil className="w-4 h-4 text-[#9c9a99]" />
-                      <span>Rename portfolio</span>
-                    </button>
-
-                    {/* Copy portfolio link */}
-                    <button
-                      onClick={() => {
-                        const link = `${window.location.origin}/portfolios/${port.id}`;
-                        navigator.clipboard.writeText(link);
-                        setToastMessage('Portfolio link copied to clipboard');
-                        setActiveMenuPortfolioId(null);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
-                    >
-                      <LinkIcon className="w-4 h-4 text-[#9c9a99]" />
-                      <span>Copy portfolio link</span>
-                    </button>
-
-                    {/* Delete portfolio */}
-                    <div className="my-1 border-t border-[#2e2f32]" />
-                    <button
-                      onClick={() => {
-                        if (confirm(`Delete portfolio "${port.name}"?`)) {
-                          deletePortfolio(port.id);
-                          setToastMessage('Portfolio deleted');
-                        }
-                        setActiveMenuPortfolioId(null);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Delete portfolio</span>
-                    </button>
-                  </div>
-                )}
+                    <div className="flex items-center gap-2 text-[12px] text-[#8a8886]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-[#4cd195]" />
+                        {port.status}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        ) : (
-          /* List View */
-          <div className="divide-y divide-[#252628] border-b border-[#2b2c2e]">
-            {displayedPortfolios.map((port) => (
-              <Link
-                key={port.id}
-                href={`/portfolios/${port.id}`}
-                className="flex items-center justify-between py-3 px-2 hover:bg-[#252628]/60 rounded-lg group transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[#1e1f21]"
-                    style={{ backgroundColor: port.color || '#dedcd8' }}
-                  >
-                    <Folder className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[13.5px] font-medium text-white group-hover:text-[#4573d2]">
-                      {port.name}
-                    </div>
-                    <div className="text-[11.5px] text-[#8a8886]">
-                      {port.projectIds?.length || 1} project • {port.privacy}
-                    </div>
-                  </div>
-                </div>
+        )}
 
-                <div className="flex items-center gap-2 text-[12px] text-[#8a8886]">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#4cd195]" />
-                    {port.status}
-                  </span>
+        {/* ============================================================== */}
+        {/* TAB 2: Browse all (Matching Asana screenshot media_1793763170041_8ba5eca3.png) */}
+        {/* ============================================================== */}
+        {activeTab === 'all' && (
+          <div className="pt-2">
+            {/* Table Header */}
+            <div className="grid grid-cols-12 gap-4 pb-2 border-b border-[#2e2f32] text-[12px] font-medium text-[#8a8886] px-2 select-none">
+              <div className="col-span-4 cursor-pointer hover:text-white flex items-center gap-1"
+                onClick={() => setSortBy(sortBy === 'alpha_asc' ? 'alpha_desc' : 'alpha_asc')}
+              >
+                <span>Name</span>
+              </div>
+              <div className="col-span-4">
+                <span>Members</span>
+              </div>
+              <div className="col-span-4">
+                <span>Parent portfolios</span>
+              </div>
+            </div>
+
+            {/* Table Rows */}
+            <div className="divide-y divide-[#252628]/50">
+              {displayedPortfolios.map((port) => (
+                <div
+                  key={port.id}
+                  data-portfolio-menu
+                  onClick={() => router.push(`/portfolios/${port.id}`)}
+                  className="grid grid-cols-12 gap-4 items-center py-2.5 px-2 hover:bg-[#252628]/60 transition-colors cursor-pointer group rounded-lg relative"
+                >
+                  {/* Column 1: Folder Icon + Name + "Joined" */}
+                  <div className="col-span-4 flex items-center gap-3 min-w-0">
+                    {/* Small Folder Silhouette with exact color */}
+                    <div className="w-6 h-4.5 shrink-0">
+                      <AsanaFolderShape
+                        color={port.color || '#dedcd8'}
+                        className="w-full h-full drop-shadow-xs"
+                      />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="text-[13.5px] font-semibold text-white group-hover:text-[#4573d2] transition-colors truncate">
+                        {port.name}
+                      </div>
+                      <div className="text-[11px] font-medium text-[#4cd195] leading-tight">
+                        Joined
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Column 2: Members Avatar */}
+                  <div className="col-span-4 flex items-center">
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-xs border border-[#1e1f21]"
+                      style={{ backgroundColor: port.owner?.avatarColor || '#d84b7f' }}
+                      title={port.owner?.name || currentUser.name}
+                    >
+                      {port.owner?.initials || 'KS'}
+                    </div>
+                  </div>
+
+                  {/* Column 3: Parent Portfolios */}
+                  <div className="col-span-4 flex items-center justify-between text-[13px] text-[#8a8886]">
+                    <span>{port.parentPortfolio || ''}</span>
+
+                    {/* Row Hover Actions (Star & Three Dots) */}
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      {/* Star button */}
+                      <button
+                        onClick={() => toggleStarred(port.id)}
+                        className="p-1 rounded text-[#8a8886] hover:text-white hover:bg-[#323438] transition-colors"
+                        title={port.isStarred ? 'Remove from starred' : 'Add to starred'}
+                      >
+                        <Star
+                          className={`w-3.5 h-3.5 ${
+                            port.isStarred ? 'fill-[#f5b324] text-[#f5b324]' : ''
+                          }`}
+                        />
+                      </button>
+
+                      {/* Three dots button */}
+                      <button
+                        onClick={() =>
+                          setActiveMenuPortfolioId(
+                            activeMenuPortfolioId === port.id ? null : port.id
+                          )
+                        }
+                        className={`p-1 rounded text-[#8a8886] hover:text-white hover:bg-[#323438] transition-colors ${
+                          activeMenuPortfolioId === port.id ? 'bg-[#323438] text-white' : ''
+                        }`}
+                        title="More actions"
+                      >
+                        <MoreHorizontal className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Pop-up Menu on Table Row */}
+                    {activeMenuPortfolioId === port.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute right-4 top-full mt-1 z-50 w-[205px] bg-[#1e1f21] border border-[#38393c] rounded-xl shadow-2xl py-1 text-[13px] text-[#cfcecd] animate-in fade-in zoom-in-95 duration-100"
+                      >
+                        {/* Share */}
+                        <button
+                          onClick={() => {
+                            setSharingPortfolio(port);
+                            setActiveMenuPortfolioId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                        >
+                          <Users className="w-4 h-4 text-[#9c9a99]" />
+                          <span>Share</span>
+                        </button>
+
+                        {/* Add to starred */}
+                        <button
+                          onClick={() => {
+                            toggleStarred(port.id);
+                            setActiveMenuPortfolioId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                        >
+                          <Star
+                            className={`w-4 h-4 ${
+                              port.isStarred ? 'fill-[#f5b324] text-[#f5b324]' : 'text-[#9c9a99]'
+                            }`}
+                          />
+                          <span>{port.isStarred ? 'Remove from starred' : 'Add to starred'}</span>
+                        </button>
+
+                        {/* Set color > */}
+                        <div className="relative group/color">
+                          <button
+                            onClick={() => {
+                              setShowColorSubmenu(showColorSubmenu === port.id ? null : port.id);
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <span
+                                className="w-3.5 h-3.5 rounded-[3px] border border-white/20 shrink-0"
+                                style={{ backgroundColor: port.color || '#dedcd8' }}
+                              />
+                              <span>Set color</span>
+                            </div>
+                            <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                          </button>
+
+                          <div className="hidden group-hover/color:block absolute right-[100%] top-0 mr-1 p-2 bg-[#1e1f21] border border-[#38393c] rounded-xl shadow-2xl z-50">
+                            <div className="grid grid-cols-3 gap-1.5 w-[96px]">
+                              {PORTFOLIO_COLORS.map((c) => (
+                                <button
+                                  key={c.value}
+                                  onClick={() => {
+                                    updatePortfolio(port.id, { color: c.value });
+                                    setActiveMenuPortfolioId(null);
+                                    setShowColorSubmenu(null);
+                                    setToastMessage(`Color updated to ${c.name}`);
+                                  }}
+                                  className={`w-6 h-6 rounded-md hover:scale-110 transition-transform flex items-center justify-center border ${
+                                    (port.color || '#dedcd8') === c.value
+                                      ? 'border-white'
+                                      : 'border-transparent'
+                                  }`}
+                                  style={{ backgroundColor: c.value }}
+                                  title={c.name}
+                                >
+                                  {(port.color || '#dedcd8') === c.value && (
+                                    <Check className="w-3 h-3 text-black stroke-[3]" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Rename portfolio */}
+                        <button
+                          onClick={() => {
+                            setRenamingPortfolio(port);
+                            setRenameValue(port.name);
+                            setActiveMenuPortfolioId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                        >
+                          <Pencil className="w-4 h-4 text-[#9c9a99]" />
+                          <span>Rename portfolio</span>
+                        </button>
+
+                        {/* Copy portfolio link */}
+                        <button
+                          onClick={() => {
+                            const link = `${window.location.origin}/portfolios/${port.id}`;
+                            navigator.clipboard.writeText(link);
+                            setToastMessage('Portfolio link copied to clipboard');
+                            setActiveMenuPortfolioId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
+                        >
+                          <LinkIcon className="w-4 h-4 text-[#9c9a99]" />
+                          <span>Copy portfolio link</span>
+                        </button>
+
+                        {/* Delete portfolio */}
+                        <div className="my-1 border-t border-[#2e2f32]" />
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete portfolio "${port.name}"?`)) {
+                              deletePortfolio(port.id);
+                              setToastMessage('Portfolio deleted');
+                            }
+                            setActiveMenuPortfolioId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span>Delete portfolio</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </Link>
-            ))}
+              ))}
+
+              {displayedPortfolios.length === 0 && (
+                <div className="py-12 text-center text-[#8a8886] text-[13px]">
+                  No portfolios match your filters.
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
