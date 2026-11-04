@@ -13,6 +13,10 @@ const nextConfig = {
   },
   webpack: (config) => {
     config.resolve.modules = [path.resolve(__dirname, 'node_modules')];
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      process: false,
+    };
     return config;
   },
 };

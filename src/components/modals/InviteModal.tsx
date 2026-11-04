@@ -5,7 +5,7 @@ import { X, Info, Check, Plus } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 export default function InviteModal() {
-  const { isInviteModalOpen, closeInviteModal, projects, inviteTeammates } = useApp();
+  const { isInviteModalOpen, closeInviteModal, projects, inviteTeammates, currentUser } = useApp();
   const [emailsInput, setEmailsInput] = useState('');
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
@@ -80,7 +80,7 @@ export default function InviteModal() {
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4">
           <h2 className="text-[19px] font-semibold text-white tracking-tight">
-            Invite people to My workspace
+            Invite people to {currentUser?.workspace || 'My workspace'}
           </h2>
           <button
             onClick={closeInviteModal}

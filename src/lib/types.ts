@@ -10,6 +10,7 @@ export interface UserAccount {
   avatarColor: string;
   avatarUrl?: string;
   workspace: string;
+  workspaces?: string[];
   role?: string;
   jobTitle?: string;
   department?: string;
@@ -40,6 +41,7 @@ export interface Goal {
   progress: number;
   status: StatusLevel;
   dueDate?: string;
+  workspace?: string;
 }
 
 export interface TeamMessage {
@@ -110,6 +112,7 @@ export interface Task {
   createdAt: string;
   taskType?: 'task' | 'milestone' | 'approval';
   customFields?: Record<string, string>;
+  workspace?: string;
 }
 
 export interface CustomColumn {
@@ -144,6 +147,7 @@ export interface Project {
   lastModified: string;
   description?: string;
   sections: string[];
+  workspace?: string;
 }
 
 export interface Portfolio {
@@ -169,4 +173,5 @@ export interface Portfolio {
   joined?: boolean;
   parentPortfolio?: string;
   lastModified?: string;
+  workspace?: string;
 }

@@ -1326,7 +1326,7 @@ export default function PortfoliosBrowsePage() {
               <div className="flex items-center justify-between p-3 rounded-xl bg-[#141517] border border-[#2e3034] hover:border-[#38393c] cursor-pointer transition-colors">
                 <div className="flex items-center gap-2.5 text-[13.5px] text-white font-medium">
                   <Building className="w-4 h-4 text-[#8a8886]" />
-                  <span>My workspace</span>
+                  <span>{currentUser.workspace || 'My workspace'}</span>
                 </div>
                 <ChevronDown className="w-4 h-4 text-[#8a8886]" />
               </div>
@@ -1353,7 +1353,7 @@ export default function PortfoliosBrowsePage() {
                     </div>
                     <div>
                       <div className="text-[13.5px] font-medium text-white">
-                        Everyone at My workspace
+                        Everyone at {currentUser.workspace || 'My workspace'}
                       </div>
                       <div className="text-[11.5px] text-[#8a8886]">
                         Your organization

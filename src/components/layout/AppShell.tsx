@@ -8,6 +8,7 @@ import SideNav from './SideNav';
 import TaskDrawer from '../tasks/TaskDrawer';
 import CreateModal from '../modals/CreateModal';
 import InviteModal from '../modals/InviteModal';
+import CreateWorkspaceModal from '../modals/CreateWorkspaceModal';
 import { useApp } from '@/context/AppContext';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -95,6 +96,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Global Modals */}
       <CreateModal />
       <InviteModal />
+      <CreateWorkspaceModal />
     </div>
   );
 }

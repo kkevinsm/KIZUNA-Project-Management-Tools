@@ -302,7 +302,7 @@ export default function TaskRow({
           ) : (
             <Building2 className="w-3.5 h-3.5 text-[#8a8886] shrink-0" />
           )}
-          <span className="truncate">{task.visibility || (task.projectName ? 'My workspace' : 'Only me')}</span>
+          <span className="truncate">{task.visibility || task.workspace || (task.projectName ? 'Workspace' : 'Only me')}</span>
         </div>
       )}
 
