@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Briefcase,
   Bot,
@@ -20,9 +20,12 @@ import { useApp } from '@/context/AppContext';
 
 export default function FarRail() {
   const router = useRouter();
+  const pathname = usePathname();
   const { currentUser, users, switchUser, logout, openInviteModal } = useApp();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const isPeopleActive = pathname?.startsWith('/people') ?? false;
 
   // Close menu on click outside
   useEffect(() => {
@@ -47,7 +50,7 @@ export default function FarRail() {
     { id: 'agents', label: 'Agents', icon: Bot, href: '#' },
     { id: 'strategy', label: 'Strategy', icon: Compass, href: '#' },
     { id: 'knowledge', label: 'Knowledge', icon: BookOpen, href: '#' },
-    { id: 'people', label: 'People', icon: Users, href: '#' },
+    { id: 'people', label: 'People', icon: Users, href: '/people' },
     { id: 'more', label: 'More', icon: MoreHorizontal, href: '#' },
   ];
 
@@ -57,7 +60,7 @@ export default function FarRail() {
       <div className="flex flex-col items-center gap-1.5 w-full">
         {railItems.map((item) => {
           const Icon = item.icon;
-          const isActive = item.id === 'work';
+          const isActive = item.id === 'people' ? isPeopleActive : item.id === 'work' ? !isPeopleActive : false;
 
           return (
             <Link

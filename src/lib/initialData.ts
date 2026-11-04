@@ -1,4 +1,4 @@
-import { Project, Task, UserAccount, Portfolio } from './types';
+import { Project, Task, UserAccount, Portfolio, Goal, TeamMessage } from './types';
 
 export const INITIAL_USERS: UserAccount[] = [
   {
@@ -10,10 +10,47 @@ export const INITIAL_USERS: UserAccount[] = [
     avatarColor: '#d84b7f',
     workspace: 'My workspace',
     role: 'Owner',
+    jobTitle: '',
+    department: '',
+    aboutMe: '',
+    isOutOfOffice: false,
   },
 ];
 
 export const INITIAL_USER = INITIAL_USERS[0];
+
+export const INITIAL_GOALS: Goal[] = [
+  {
+    id: 'goal-1',
+    title: 'Deliver Kizuna v1.0 Production Platform',
+    owner: {
+      name: 'Kevin Safrisal',
+      initials: 'KS',
+      avatarColor: '#d84b7f',
+    },
+    timePeriod: 'Q4 FY26 Oct 1 - Dec 31',
+    privacy: 'Public to My workspace',
+    progress: 85,
+    status: 'On track',
+    dueDate: 'Dec 31',
+  },
+];
+
+export const INITIAL_TEAM_MESSAGES: TeamMessage[] = [
+  {
+    id: 'msg-1',
+    title: 'Welcome to My workspace team!',
+    author: {
+      name: 'Kevin Safrisal',
+      initials: 'KS',
+      avatarColor: '#d84b7f',
+    },
+    content: 'Welcome everyone to our shared workspace! Feel free to post updates, share documents, and collaborate on projects here.',
+    createdAt: 'Yesterday at 10:00 AM',
+    likes: 2,
+    commentsCount: 1,
+  },
+];
 
 export const INITIAL_PROJECTS: Project[] = [
   {

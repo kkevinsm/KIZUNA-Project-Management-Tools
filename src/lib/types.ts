@@ -11,6 +11,34 @@ export interface UserAccount {
   avatarUrl?: string;
   workspace: string;
   role?: string;
+  jobTitle?: string;
+  department?: string;
+  aboutMe?: string;
+  pronouns?: string;
+  isOutOfOffice?: boolean;
+  outOfOfficeNote?: string;
+}
+
+export interface Goal {
+  id: string;
+  title: string;
+  owner: { name: string; initials: string; avatarColor: string };
+  members?: { name: string; email: string }[];
+  timePeriod: string;
+  privacy: string;
+  progress: number;
+  status: StatusLevel;
+  dueDate?: string;
+}
+
+export interface TeamMessage {
+  id: string;
+  title: string;
+  author: { name: string; initials: string; avatarColor: string };
+  content: string;
+  createdAt: string;
+  likes: number;
+  commentsCount: number;
 }
 
 export interface Assignee {

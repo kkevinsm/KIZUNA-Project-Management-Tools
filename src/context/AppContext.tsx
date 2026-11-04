@@ -12,8 +12,17 @@ import {
   UserAccount,
   Assignee,
   Portfolio,
+  Goal,
+  TeamMessage,
 } from '@/lib/types';
-import { INITIAL_TASKS, INITIAL_PROJECTS, INITIAL_USERS, INITIAL_PORTFOLIOS } from '@/lib/initialData';
+import {
+  INITIAL_TASKS,
+  INITIAL_PROJECTS,
+  INITIAL_USERS,
+  INITIAL_PORTFOLIOS,
+  INITIAL_GOALS,
+  INITIAL_TEAM_MESSAGES,
+} from '@/lib/initialData';
 
 interface AppContextType {
   tasks: Task[];
@@ -71,6 +80,13 @@ interface AppContextType {
   removeAttachment: (taskId: string, attachmentId: string) => void;
   viewConfigs: Record<string, { name: string; icon?: string }>;
   updateViewConfig: (viewKey: string, updates: Partial<{ name: string; icon?: string }>) => void;
+  goals: Goal[];
+  createGoal: (goalData: { title: string; timePeriod?: string; privacy?: string }) => Goal;
+  updateUserProfile: (data: Partial<UserAccount>) => void;
+  teamMessages: TeamMessage[];
+  addTeamMessage: (title: string, content: string) => void;
+  teamDescription: string;
+  setTeamDescription: (desc: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -100,6 +116,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
   const [portfolios, setPortfolios] = useState<Portfolio[]>(INITIAL_PORTFOLIOS);
+  const [goals, setGoals] = useState<Goal[]>(INITIAL_GOALS);
+  const [teamMessages, setTeamMessages] = useState<TeamMessage[]>(INITIAL_TEAM_MESSAGES);
+  const [teamDescription, setTeamDescription] = useState<string>('');
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -219,6 +238,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }));
         setProjects(parsedProjects);
       }
+
+      const savedGoals = localStorage.getItem('kizuna_goals');
+      if (savedGoals) {
+        try { setGoals(JSON.parse(savedGoals)); } catch {}
+      }
+      const savedTeamDesc = localStorage.getItem('kizuna_team_desc');
+      if (savedTeamDesc) {
+        setTeamDescription(savedTeamDesc);
+      }
+      const savedMessages = localStorage.getItem('kizuna_team_messages');
+      if (savedMessages) {
+        try { setTeamMessages(JSON.parse(savedMessages)); } catch {}
+      }
     } catch {
       // Fallback
     }
@@ -235,6 +267,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('kizuna_tasks', JSON.stringify(tasks));
       localStorage.setItem('kizuna_projects', JSON.stringify(projects));
       localStorage.setItem('kizuna_portfolios', JSON.stringify(portfolios));
+      localStorage.setItem('kizuna_goals', JSON.stringify(goals));
+      localStorage.setItem('kizuna_team_desc', teamDescription);
+      localStorage.setItem('kizuna_team_messages', JSON.stringify(teamMessages));
 
       // Cloudflare R2 Database Sync
       syncToCloudflareR2('users', users);
@@ -682,6 +717,52 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const updateUserProfile = (data: Partial<UserAccount>) => {
+    setCurrentUser((prev) => {
+      const updated = { ...prev, ...data };
+      setUsers((prevUsers) =>
+        prevUsers.map((u) => (u.id === prev.id ? updated : u))
+      );
+      return updated;
+    });
+  };
+
+  const createGoal = (goalData: { title: string; timePeriod?: string; privacy?: string }) => {
+    const newGoal: Goal = {
+      id: `goal-${Date.now()}`,
+      title: goalData.title.trim() || 'New Goal',
+      owner: {
+        name: currentUser.name,
+        initials: currentUser.initials,
+        avatarColor: currentUser.avatarColor,
+      },
+      timePeriod: goalData.timePeriod || 'Q4 FY26 Oct 1 - Dec 31',
+      privacy: goalData.privacy || 'Public to My workspace',
+      progress: 0,
+      status: 'On track',
+      dueDate: 'Dec 31',
+    };
+    setGoals((prev) => [newGoal, ...prev]);
+    return newGoal;
+  };
+
+  const addTeamMessage = (title: string, content: string) => {
+    const newMsg: TeamMessage = {
+      id: `msg-${Date.now()}`,
+      title: title.trim(),
+      author: {
+        name: currentUser.name,
+        initials: currentUser.initials,
+        avatarColor: currentUser.avatarColor,
+      },
+      content: content.trim(),
+      createdAt: 'Just now',
+      likes: 0,
+      commentsCount: 0,
+    };
+    setTeamMessages((prev) => [newMsg, ...prev]);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -729,6 +810,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         removeAttachment,
         viewConfigs,
         updateViewConfig,
+        goals,
+        createGoal,
+        updateUserProfile,
+        teamMessages,
+        addTeamMessage,
+        teamDescription,
+        setTeamDescription,
       }}
     >
       {children}
