@@ -456,15 +456,17 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Main Content Body */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-hidden flex flex-col">
         {/* ============================================================== */}
         {/* 1. LIST VIEW                                                   */}
         {/* ============================================================== */}
         {activeTab === 'List' && (
-          <div className="flex-1 overflow-x-auto overflow-y-auto w-full">
-            <div className="min-w-max pb-24">
-              {/* Table Column Headers with Asana Column Header Menus (matching f_005.jpg & f_025.jpg) */}
-              <div className="flex items-center h-[34px] border-b border-[#262729] text-[#8a8886] font-semibold text-[11px] select-none bg-[#1e1f21] sticky top-0 z-30">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {/* Scrollable Table Area (Only Table Content Scrolls Horizontally, Name is Sticky) */}
+            <div className="flex-1 overflow-x-auto overflow-y-auto w-full">
+              <div className="min-w-max pb-12">
+                {/* Table Column Headers with Asana Column Header Menus (matching f_005.jpg & f_025.jpg) */}
+                <div className="flex items-center h-[34px] border-b border-[#262729] text-[#8a8886] font-semibold text-[11px] select-none bg-[#1e1f21] sticky top-0 z-30">
                 {/* Sticky Name Column Header (matches TaskRow 440px sticky left) */}
                 <div className="w-[440px] min-w-[440px] max-w-[440px] shrink-0 sticky left-0 z-35 bg-[#1e1f21] px-4 flex items-center h-full">
                   <span className="font-semibold text-[11px] uppercase tracking-wider text-[#8a8886]">
@@ -1081,53 +1083,47 @@ export default function ProjectDetailPage() {
                   <span>Add section</span>
                 </button>
               </div>
-
-              {/* Bottom Explore Your Project Banner */}
-              <div className="p-4 sticky left-0 z-10 max-w-full">
-                <ExploreProjectBar />
-              </div>
             </div>
           </div>
-        )}
+
+          {/* Bottom Explore Your Project Banner (Fixed at bottom of screen, not horizontally scrolled) */}
+          <div className="px-4 py-3 shrink-0 bg-[#1e1f21] w-full border-t border-[#252628]/60">
+            <ExploreProjectBar />
+          </div>
+        </div>
+      )}
 
         {/* ============================================================== */}
-        {/* 2. BOARD VIEW                                                  */}
+        {/* OTHER VIEWS (Scrollable)                                       */}
         {/* ============================================================== */}
-        {activeTab === 'Board' && (
-          <TaskBoard sections={sections} tasks={projectTasks} projectId={project.id} />
-        )}
+        {activeTab !== 'List' && (
+          <div className="flex-1 overflow-y-auto">
+            {/* 2. BOARD VIEW */}
+            {activeTab === 'Board' && (
+              <TaskBoard sections={sections} tasks={projectTasks} projectId={project.id} />
+            )}
 
-        {/* ============================================================== */}
-        {/* 3. TIMELINE (GANTT) VIEW                                       */}
-        {/* ============================================================== */}
-        {activeTab === 'Timeline' && (
-          <TaskTimeline tasks={projectTasks} sections={sections} projectId={project.id} />
-        )}
+            {/* 3. TIMELINE (GANTT) VIEW */}
+            {activeTab === 'Timeline' && (
+              <TaskTimeline tasks={projectTasks} sections={sections} projectId={project.id} />
+            )}
 
-        {/* ============================================================== */}
-        {/* 4. DASHBOARD VIEW                                              */}
-        {/* ============================================================== */}
-        {activeTab === 'Dashboard' && (
-          <TaskDashboard tasks={projectTasks} projectName={project.name} />
-        )}
+            {/* 4. DASHBOARD VIEW */}
+            {activeTab === 'Dashboard' && (
+              <TaskDashboard tasks={projectTasks} projectName={project.name} />
+            )}
 
-        {/* ============================================================== */}
-        {/* 5. FILES VIEW (Connected with Cloudflare R2!)                  */}
-        {/* ============================================================== */}
-        {activeTab === 'Files' && (
-          <TaskFiles tasks={projectTasks} projectName={project.name} />
-        )}
+            {/* 5. FILES VIEW */}
+            {activeTab === 'Files' && (
+              <TaskFiles tasks={projectTasks} projectName={project.name} />
+            )}
 
-        {/* ============================================================== */}
-        {/* 6. CALENDAR VIEW                                               */}
-        {/* ============================================================== */}
-        {activeTab === 'Calendar' && <TaskCalendar tasks={projectTasks} />}
+            {/* 6. CALENDAR VIEW */}
+            {activeTab === 'Calendar' && <TaskCalendar tasks={projectTasks} />}
 
-        {/* ============================================================== */}
-        {/* 7. OVERVIEW VIEW (Authentic Asana matching video frame 130)     */}
-        {/* ============================================================== */}
-        {activeTab === 'Overview' && (
-          <div className="p-8 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 select-none">
+            {/* 7. OVERVIEW VIEW */}
+            {activeTab === 'Overview' && (
+              <div className="p-8 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 select-none">
             {/* Left Main Column: AI Summary + Description + Roles */}
             <div className="space-y-6">
               {/* AI Summary Card (Matching Asana video frame 130) */}
@@ -1349,6 +1345,8 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
           </div>
         )}
       </div>
