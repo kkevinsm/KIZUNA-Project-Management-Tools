@@ -29,6 +29,8 @@ import {
   Trash2,
   SlidersHorizontal,
   ArrowUpDown,
+  Building,
+  User,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Portfolio } from '@/lib/types';
@@ -97,6 +99,8 @@ export default function PortfoliosBrowsePage() {
   const [renamingPortfolio, setRenamingPortfolio] = useState<Portfolio | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [sharingPortfolio, setSharingPortfolio] = useState<Portfolio | null>(null);
+  const [shareInviteEmail, setShareInviteEmail] = useState('');
+  const [shareInviteRole, setShareInviteRole] = useState<'Editor' | 'Commenter' | 'Viewer'>('Editor');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Wizard state (matching Asana video 2 frames 015-035)
@@ -778,164 +782,34 @@ export default function PortfoliosBrowsePage() {
                   <div className="col-span-4 flex items-center justify-between text-[13px] text-[#8a8886]">
                     <span>{port.parentPortfolio || ''}</span>
 
-                    {/* Row Hover Actions (Star & Three Dots) */}
+                    {/* Row Hover Actions (Star & Share Button matching screenshot media_1793763701778_7e4a8498.png) */}
                     <div
                       onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       {/* Star button */}
                       <button
                         onClick={() => toggleStarred(port.id)}
-                        className="p-1 rounded text-[#8a8886] hover:text-white hover:bg-[#323438] transition-colors"
+                        className={`p-1.5 rounded-lg hover:bg-[#323438] transition-colors cursor-pointer ${
+                          port.isStarred ? 'text-[#f5b324]' : 'text-[#8a8886] hover:text-white'
+                        }`}
                         title={port.isStarred ? 'Remove from starred' : 'Add to starred'}
                       >
                         <Star
-                          className={`w-3.5 h-3.5 ${
-                            port.isStarred ? 'fill-[#f5b324] text-[#f5b324]' : ''
+                          className={`w-4 h-4 ${
+                            port.isStarred ? 'fill-[#f5b324]' : ''
                           }`}
                         />
                       </button>
 
-                      {/* Three dots button */}
+                      {/* Share button matching Asana screenshot */}
                       <button
-                        onClick={() =>
-                          setActiveMenuPortfolioId(
-                            activeMenuPortfolioId === port.id ? null : port.id
-                          )
-                        }
-                        className={`p-1 rounded text-[#8a8886] hover:text-white hover:bg-[#323438] transition-colors ${
-                          activeMenuPortfolioId === port.id ? 'bg-[#323438] text-white' : ''
-                        }`}
-                        title="More actions"
+                        onClick={() => setSharingPortfolio(port)}
+                        className="px-3.5 py-1.5 rounded-lg bg-[#2a2b2e] hover:bg-[#34363a] border border-[#3a3b3e] text-white text-[13px] font-medium transition-colors shadow-xs cursor-pointer"
                       >
-                        <MoreHorizontal className="w-3.5 h-3.5" />
+                        Share
                       </button>
                     </div>
-
-                    {/* Pop-up Menu on Table Row */}
-                    {activeMenuPortfolioId === port.id && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute right-4 top-full mt-1 z-50 w-[205px] bg-[#1e1f21] border border-[#38393c] rounded-xl shadow-2xl py-1 text-[13px] text-[#cfcecd] animate-in fade-in zoom-in-95 duration-100"
-                      >
-                        {/* Share */}
-                        <button
-                          onClick={() => {
-                            setSharingPortfolio(port);
-                            setActiveMenuPortfolioId(null);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
-                        >
-                          <Users className="w-4 h-4 text-[#9c9a99]" />
-                          <span>Share</span>
-                        </button>
-
-                        {/* Add to starred */}
-                        <button
-                          onClick={() => {
-                            toggleStarred(port.id);
-                            setActiveMenuPortfolioId(null);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
-                        >
-                          <Star
-                            className={`w-4 h-4 ${
-                              port.isStarred ? 'fill-[#f5b324] text-[#f5b324]' : 'text-[#9c9a99]'
-                            }`}
-                          />
-                          <span>{port.isStarred ? 'Remove from starred' : 'Add to starred'}</span>
-                        </button>
-
-                        {/* Set color > */}
-                        <div className="relative group/color">
-                          <button
-                            onClick={() => {
-                              setShowColorSubmenu(showColorSubmenu === port.id ? null : port.id);
-                            }}
-                            className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <span
-                                className="w-3.5 h-3.5 rounded-[3px] border border-white/20 shrink-0"
-                                style={{ backgroundColor: port.color || '#dedcd8' }}
-                              />
-                              <span>Set color</span>
-                            </div>
-                            <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
-                          </button>
-
-                          <div className="hidden group-hover/color:block absolute right-[100%] top-0 mr-1 p-2 bg-[#1e1f21] border border-[#38393c] rounded-xl shadow-2xl z-50">
-                            <div className="grid grid-cols-3 gap-1.5 w-[96px]">
-                              {PORTFOLIO_COLORS.map((c) => (
-                                <button
-                                  key={c.value}
-                                  onClick={() => {
-                                    updatePortfolio(port.id, { color: c.value });
-                                    setActiveMenuPortfolioId(null);
-                                    setShowColorSubmenu(null);
-                                    setToastMessage(`Color updated to ${c.name}`);
-                                  }}
-                                  className={`w-6 h-6 rounded-md hover:scale-110 transition-transform flex items-center justify-center border ${
-                                    (port.color || '#dedcd8') === c.value
-                                      ? 'border-white'
-                                      : 'border-transparent'
-                                  }`}
-                                  style={{ backgroundColor: c.value }}
-                                  title={c.name}
-                                >
-                                  {(port.color || '#dedcd8') === c.value && (
-                                    <Check className="w-3 h-3 text-black stroke-[3]" />
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Rename portfolio */}
-                        <button
-                          onClick={() => {
-                            setRenamingPortfolio(port);
-                            setRenameValue(port.name);
-                            setActiveMenuPortfolioId(null);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
-                        >
-                          <Pencil className="w-4 h-4 text-[#9c9a99]" />
-                          <span>Rename portfolio</span>
-                        </button>
-
-                        {/* Copy portfolio link */}
-                        <button
-                          onClick={() => {
-                            const link = `${window.location.origin}/portfolios/${port.id}`;
-                            navigator.clipboard.writeText(link);
-                            setToastMessage('Portfolio link copied to clipboard');
-                            setActiveMenuPortfolioId(null);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2b2e] hover:text-white transition-colors cursor-pointer"
-                        >
-                          <LinkIcon className="w-4 h-4 text-[#9c9a99]" />
-                          <span>Copy portfolio link</span>
-                        </button>
-
-                        {/* Delete portfolio */}
-                        <div className="my-1 border-t border-[#2e2f32]" />
-                        <button
-                          onClick={() => {
-                            if (confirm(`Delete portfolio "${port.name}"?`)) {
-                              deletePortfolio(port.id);
-                              setToastMessage('Portfolio deleted');
-                            }
-                            setActiveMenuPortfolioId(null);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span>Delete portfolio</span>
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
@@ -1336,86 +1210,196 @@ export default function PortfoliosBrowsePage() {
       )}
 
       {/* ============================================================== */}
-      {/* Share Portfolio Dialog                                         */}
+      {/* Share Portfolio Dialog (Matching screenshot media_1793763716032_4ba5fe1c.jpg) */}
       {/* ============================================================== */}
       {sharingPortfolio && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-[#1e1f21] border border-[#37383b] rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-6 h-6 rounded-md flex items-center justify-center"
-                  style={{ backgroundColor: sharingPortfolio.color || '#dedcd8' }}
-                >
-                  <Folder className="w-3.5 h-3.5 text-[#1e1f21]" />
-                </div>
-                <h3 className="text-[17px] font-bold text-white truncate max-w-[340px]">
-                  Share {sharingPortfolio.name}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSharingPortfolio(null)}
-                className="p-1 rounded text-[#8a8886] hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* Invite link copy */}
-              <div className="flex items-center justify-between p-3 bg-[#141517] rounded-xl border border-[#2e3034]">
-                <div className="flex items-center gap-2.5">
-                  <LinkIcon className="w-4 h-4 text-[#4573d2]" />
-                  <div>
-                    <div className="text-[13px] font-medium text-white">Anyone in workspace can view</div>
-                    <div className="text-[11.5px] text-[#8a8886]">Workspace members have read-only access</div>
-                  </div>
-                </div>
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-[#1e1f21] border border-[#38393c] rounded-2xl w-full max-w-[540px] p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            {/* Header: Title + Copy link icon + Close button */}
+            <div className="flex items-center justify-between pb-1">
+              <h3 className="text-[18px] font-bold text-white tracking-tight">
+                Share {sharingPortfolio.name}
+              </h3>
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => {
                     const link = `${window.location.origin}/portfolios/${sharingPortfolio.id}`;
                     navigator.clipboard.writeText(link);
                     setToastMessage('Portfolio link copied to clipboard');
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-[#252628] hover:bg-[#2e3034] text-white text-[12px] font-medium border border-[#37383b] transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors cursor-pointer"
+                  title="Copy link"
                 >
-                  Copy link
+                  <LinkIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setSharingPortfolio(null)}
+                  className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Section 1: Invite with email */}
+            <div className="space-y-3">
+              <label className="block text-[13px] font-semibold text-white">
+                Invite with email
+              </label>
+
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center bg-[#141517] border border-[#37383b] focus-within:border-white rounded-xl overflow-hidden px-3.5 py-1.5 transition-colors">
+                  <input
+                    type="text"
+                    value={shareInviteEmail}
+                    onChange={(e) => setShareInviteEmail(e.target.value)}
+                    placeholder="Add people, emails, or teams..."
+                    className="bg-transparent text-[13.5px] text-white placeholder-[#717377] focus:outline-none flex-1 py-1"
+                  />
+                  <div className="flex items-center gap-1 text-[13px] text-[#cfcecd] hover:text-white cursor-pointer px-2 py-0.5 rounded">
+                    <span>{shareInviteRole}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                  </div>
+                </div>
+
+                <button
+                  disabled={!shareInviteEmail.trim()}
+                  onClick={() => {
+                    if (!shareInviteEmail.trim()) return;
+                    setToastMessage(`Invited ${shareInviteEmail.trim()} to portfolio`);
+                    setShareInviteEmail('');
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
+                    shareInviteEmail.trim()
+                      ? 'bg-[#4573d2] hover:bg-[#3b66be] text-white cursor-pointer'
+                      : 'bg-[#252628] text-[#5d5f63] cursor-not-allowed border border-[#303236]'
+                  }`}
+                >
+                  Invite
                 </button>
               </div>
 
-              {/* Member list */}
-              <div>
-                <div className="text-[12px] font-semibold text-[#8a8886] mb-2 uppercase tracking-wider">
-                  Members with access
+              {/* Checkboxes */}
+              <div className="space-y-2 pt-1">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="mt-0.5 rounded border-[#3a3b3e] bg-[#141517] text-[#4573d2] focus:ring-0 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-[13px] text-white font-normal leading-tight">
+                      Give access to all projects in this portfolio that I can share
+                    </div>
+                    <div className="text-[12px] text-[#8a8886] mt-0.5">
+                      Users will get up to the project's default access level
+                    </div>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="rounded border-[#3a3b3e] bg-[#141517] text-[#4573d2] focus:ring-0 cursor-pointer"
+                  />
+                  <span className="text-[13px] text-white font-normal leading-tight">
+                    Notify when work is added to the portfolio
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="border-t border-[#2e2f32]" />
+
+            {/* Section 2: Access settings */}
+            <div className="space-y-2">
+              <label className="block text-[13px] font-semibold text-white">
+                Access settings
+              </label>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[#141517] border border-[#2e3034] hover:border-[#38393c] cursor-pointer transition-colors">
+                <div className="flex items-center gap-2.5 text-[13.5px] text-white font-medium">
+                  <Building className="w-4 h-4 text-[#8a8886]" />
+                  <span>My workspace</span>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 rounded-lg hover:bg-[#252628]">
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold"
-                        style={{ backgroundColor: sharingPortfolio.owner?.avatarColor || '#d84b7f' }}
-                      >
-                        {sharingPortfolio.owner?.initials || 'KS'}
+                <ChevronDown className="w-4 h-4 text-[#8a8886]" />
+              </div>
+            </div>
+
+            {/* Section 3: Who has access */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-semibold text-white">Who has access</span>
+                <button
+                  onClick={() => setToastMessage("Notification settings opened")}
+                  className="text-[13px] text-[#4573d2] hover:underline cursor-pointer font-medium"
+                >
+                  Manage notifications
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                {/* Everyone at My workspace */}
+                <div className="flex items-center justify-between py-2 px-1">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-[#252628] border border-[#37383b] flex items-center justify-center text-[#8a8886]">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-[13.5px] font-medium text-white">
+                        Everyone at My workspace
                       </div>
-                      <div>
-                        <div className="text-[13px] font-medium text-white">
-                          {sharingPortfolio.owner?.name || currentUser.name}
-                        </div>
-                        <div className="text-[11px] text-[#8a8886]">Portfolio Owner</div>
+                      <div className="text-[11.5px] text-[#8a8886]">
+                        Your organization
                       </div>
                     </div>
-                    <span className="text-[12px] text-[#8a8886]">Owner</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[13px] text-[#cfcecd] hover:text-white cursor-pointer px-2 py-1 rounded">
+                    <span>Editor</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                  </div>
+                </div>
+
+                {/* Kevin Safrisal */}
+                <div className="flex items-center justify-between py-2 px-1">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-xs"
+                      style={{ backgroundColor: sharingPortfolio.owner?.avatarColor || '#d84b7f' }}
+                    >
+                      {sharingPortfolio.owner?.initials || 'KS'}
+                    </div>
+                    <div>
+                      <div className="text-[13.5px] font-medium text-white">
+                        {sharingPortfolio.owner?.name || currentUser.name}
+                      </div>
+                      <div className="text-[11.5px] text-[#8a8886]">
+                        kevinsafrisal@gmail.com
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[13px] text-[#cfcecd] hover:text-white cursor-pointer px-2 py-1 rounded">
+                    <span>Portfolio admin</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            {/* Footer: Copy portfolio link button */}
+            <div className="flex justify-end pt-2 border-t border-[#2e2f32]">
               <button
-                onClick={() => setSharingPortfolio(null)}
-                className="px-4 py-1.5 rounded-lg bg-[#4573d2] hover:bg-[#3b66be] text-white text-[13px] font-medium transition-colors cursor-pointer"
+                onClick={() => {
+                  const link = `${window.location.origin}/portfolios/${sharingPortfolio.id}`;
+                  navigator.clipboard.writeText(link);
+                  setToastMessage('Portfolio link copied to clipboard');
+                }}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#252628] hover:bg-[#2e3034] border border-[#37383b] text-white text-[13px] font-medium transition-colors cursor-pointer"
               >
-                Done
+                <LinkIcon className="w-4 h-4 text-[#cfcecd]" />
+                <span>Copy portfolio link</span>
               </button>
             </div>
           </div>
