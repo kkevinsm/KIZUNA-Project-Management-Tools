@@ -108,9 +108,9 @@ export default function SideNav() {
             })}
             {/* Portfolio in Work list matching Asana screenshot */}
             <Link
-              href="/portfolios"
+              href="/portfolios/my-first-portfolio"
               className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg group transition-colors ${
-                pathname === '/portfolios'
+                pathname.startsWith('/portfolios/') || pathname.startsWith('/portfolio/')
                   ? 'bg-[#2a2b2e] text-white font-medium'
                   : 'text-[#bdbbb9] hover:bg-[#252628] hover:text-white'
               }`}

@@ -11,8 +11,9 @@ import {
   StatusLevel,
   UserAccount,
   Assignee,
+  Portfolio,
 } from '@/lib/types';
-import { INITIAL_TASKS, INITIAL_PROJECTS, INITIAL_USERS } from '@/lib/initialData';
+import { INITIAL_TASKS, INITIAL_PROJECTS, INITIAL_USERS, INITIAL_PORTFOLIOS } from '@/lib/initialData';
 
 interface AppContextType {
   tasks: Task[];
@@ -59,6 +60,9 @@ interface AppContextType {
   toggleTaskComplete: (taskId: string) => void;
   deleteTask: (taskId: string) => void;
   createProject: (name: string, description?: string) => Project;
+  portfolios: Portfolio[];
+  createPortfolio: (name: string, defaultView?: 'List' | 'Timeline' | 'Workload') => Portfolio;
+  updatePortfolio: (id: string, updates: Partial<Portfolio>) => void;
   addComment: (taskId: string, text: string) => void;
   addSubtask: (taskId: string, name: string) => void;
   toggleSubtask: (taskId: string, subtaskId: string) => void;
@@ -94,6 +98,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>(INITIAL_PORTFOLIOS);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -148,7 +153,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const savedAuth = localStorage.getItem('kizuna_is_auth');
       const savedTasks = localStorage.getItem('kizuna_tasks');
       const savedProjects = localStorage.getItem('kizuna_projects');
+      const savedPortfolios = localStorage.getItem('kizuna_portfolios');
       const savedViewConfigs = localStorage.getItem('kizuna_view_configs');
+
+      if (savedPortfolios) {
+        try {
+          setPortfolios(JSON.parse(savedPortfolios));
+        } catch {}
+      }
 
       if (savedViewConfigs) {
         try {
@@ -221,6 +233,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('kizuna_is_auth', String(isAuthenticated));
       localStorage.setItem('kizuna_tasks', JSON.stringify(tasks));
       localStorage.setItem('kizuna_projects', JSON.stringify(projects));
+      localStorage.setItem('kizuna_portfolios', JSON.stringify(portfolios));
 
       // Cloudflare R2 Database Sync
       syncToCloudflareR2('users', users);
@@ -547,6 +560,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return newProject;
   };
 
+  const createPortfolio = (
+    name: string,
+    defaultView: 'List' | 'Timeline' | 'Workload' = 'List'
+  ): Portfolio => {
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + `-${Date.now()}`;
+    const newPort: Portfolio = {
+      id,
+      name,
+      status: 'On track',
+      owner: {
+        name: currentUser.name,
+        initials: currentUser.initials,
+        avatarColor: currentUser.avatarColor,
+      },
+      members: [
+        {
+          name: currentUser.name,
+          initials: currentUser.initials,
+          avatarColor: currentUser.avatarColor,
+        },
+      ],
+      projectIds: ['kevins-first-project'],
+      defaultView,
+      privacy: 'Public to My workspace',
+      dueDateRange: 'Nov 3 – Dec 1',
+      isStarred: false,
+      statusUpdate: {
+        title: `${name} is on track!`,
+        summary:
+          'This is a sample portfolio status update. Use portfolio status updates to give teammates and leaders visibility into how projects are progressing.',
+        updatedAt: 'Just now',
+        author: currentUser.name,
+      },
+    };
+
+    setPortfolios((prev) => [...prev, newPort]);
+    return newPort;
+  };
+
+  const updatePortfolio = (id: string, updates: Partial<Portfolio>) => {
+    setPortfolios((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+    );
+  };
+
   const addComment = (taskId: string, text: string) => {
     if (!text.trim()) return;
     const newComment: Comment = {
@@ -655,6 +713,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         toggleTaskComplete,
         deleteTask,
         createProject,
+        portfolios,
+        createPortfolio,
+        updatePortfolio,
         addComment,
         addSubtask,
         toggleSubtask,

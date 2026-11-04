@@ -1,4 +1,4 @@
-import { Project, Task, UserAccount } from './types';
+import { Project, Task, UserAccount, Portfolio } from './types';
 
 export const INITIAL_USERS: UserAccount[] = [
   {
@@ -32,6 +32,38 @@ export const INITIAL_PROJECTS: Project[] = [
     lastModified: 'Just now',
     description: 'Welcome to your first project! Track work, assign due dates, and collaborate.',
     sections: ['To do', 'Doing', 'Done'],
+  },
+];
+
+export const INITIAL_PORTFOLIOS: Portfolio[] = [
+  {
+    id: 'my-first-portfolio',
+    name: 'My first portfolio',
+    status: 'On track',
+    statusUpdate: {
+      title: 'This portfolio of work is on track!',
+      summary:
+        'This is a sample portfolio status update in Asana. Use portfolio status updates to give teammates and leaders visibility into how projects are progressing. Asana can help you aggregate multiple project status updates into one streamlined report so you can focus on what matters most.',
+      updatedAt: 'Yesterday at 11:18am',
+      author: 'Kevin Safrisal',
+    },
+    owner: {
+      name: 'Kevin Safrisal',
+      initials: 'KS',
+      avatarColor: '#d84b7f',
+    },
+    members: [
+      {
+        name: 'Kevin Safrisal',
+        initials: 'KS',
+        avatarColor: '#d84b7f',
+      },
+    ],
+    projectIds: ['kevins-first-project'],
+    defaultView: 'List',
+    privacy: 'Public to My workspace',
+    dueDateRange: 'Nov 3 – Dec 1',
+    isStarred: false,
   },
 ];
 

@@ -96,3 +96,22 @@ export interface Project {
   description?: string;
   sections: string[];
 }
+
+export interface Portfolio {
+  id: string;
+  name: string;
+  status: 'On track' | 'At risk' | 'Off track' | 'On hold' | 'Complete';
+  statusUpdate?: {
+    title: string;
+    summary: string;
+    updatedAt: string;
+    author: string;
+  };
+  owner: Assignee;
+  members: Assignee[];
+  projectIds: string[];
+  defaultView: 'List' | 'Timeline' | 'Workload';
+  privacy: string;
+  dueDateRange?: string;
+  isStarred?: boolean;
+}
