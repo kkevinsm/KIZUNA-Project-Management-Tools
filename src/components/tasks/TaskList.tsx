@@ -45,6 +45,7 @@ import ListOptionsDrawer from '@/components/tasks/ListOptionsDrawer';
 import AddTaskSplitButton from '@/components/tasks/AddTaskSplitButton';
 import FilterPopoverContent, { FilterRule, evaluateTaskFilters } from '@/components/tasks/FilterPopoverContent';
 import EditFieldModal from '@/components/modals/EditFieldModal';
+import AddFieldModal from '@/components/modals/AddFieldModal';
 import { Task, PriorityLevel, CustomColumn } from '@/lib/types';
 
 interface TaskListProps {
@@ -92,7 +93,28 @@ export default function TaskList({
 
   // Add custom column state
   const [isAddColumnOpen, setIsAddColumnOpen] = useState(false);
+  const [isAddFieldModalOpen, setIsAddFieldModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
+
+  const handleCreateCustomField = (field: {
+    title: string;
+    type: any;
+    description?: string;
+    options?: any[];
+  }) => {
+    const newCol: CustomColumn = {
+      id: field.title.toLowerCase().replace(/\s+/g, '-'),
+      name: field.title,
+      type: field.type,
+      options: field.options?.map((o) => o.name),
+    };
+    setCustomColumns((prev) => [...prev, newCol]);
+    setToastMessage(`${field.title} added successfully.`);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === `${field.title} added successfully.` ? null : prev));
+    }, 4000);
+  };
 
   // Save customColumns to localStorage
   useEffect(() => {
@@ -1141,8 +1163,8 @@ export default function TaskList({
                 </div>
               ) : (
                 <button
-                  onClick={() => setIsAddColumnOpen(true)}
-                  className="px-3 py-1 text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors h-full flex items-center justify-center"
+                  onClick={() => setIsAddFieldModalOpen(true)}
+                  className="px-3 py-1 text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors h-full flex items-center justify-center cursor-pointer"
                   title="Add field"
                 >
                   <Plus className="w-3.5 h-3.5 text-[#8a8886] hover:text-white" />
@@ -1506,6 +1528,26 @@ export default function TaskList({
           }
         }}
       />
+
+      {/* Add Field Modal (matching Asana frame f_038.jpg) */}
+      <AddFieldModal
+        isOpen={isAddFieldModalOpen}
+        onClose={() => setIsAddFieldModalOpen(false)}
+        onCreateField={handleCreateCustomField}
+      />
+
+      {/* Toast Notification (matching Asana frame f_048.jpg) */}
+      {toastMessage && (
+        <div className="fixed bottom-6 left-6 z-[90] flex items-center justify-between gap-4 bg-[#1e1f21] border border-[#383a3d] text-white px-3.5 py-2.5 rounded-xl shadow-2xl text-[13px] animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <span>{toastMessage}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-[#8a8886] hover:text-white p-0.5 rounded cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Right-side List Options Drawer */}
       <ListOptionsDrawer

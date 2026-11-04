@@ -32,6 +32,9 @@ import {
   AlertCircle,
   X,
   Link2,
+  EyeOff,
+  Trash2,
+  Key,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import TaskRow from '@/components/tasks/TaskRow';
@@ -44,7 +47,8 @@ import ListOptionsDrawer from '@/components/tasks/ListOptionsDrawer';
 import CustomizeDrawer from '@/components/layout/CustomizeDrawer';
 import ExploreProjectBar from '@/components/modals/ExploreProjectBar';
 import EditFieldModal from '@/components/modals/EditFieldModal';
-import { StatusLevel, PriorityLevel } from '@/lib/types';
+import AddFieldModal from '@/components/modals/AddFieldModal';
+import { StatusLevel, PriorityLevel, CustomColumn } from '@/lib/types';
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -67,10 +71,66 @@ export default function ProjectDetailPage() {
     priorityOptions,
     updateStatusOptions,
     updatePriorityOptions,
+    autoFillTaskStatus,
   } = useApp();
 
   const [isEditFieldModalOpen, setIsEditFieldModalOpen] = useState(false);
   const [editFieldType, setEditFieldType] = useState<'Status' | 'Priority'>('Status');
+  const [isAddFieldModalOpen, setIsAddFieldModalOpen] = useState(false);
+  const [openColumnMenu, setOpenColumnMenu] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isInlineNewFieldActive, setIsInlineNewFieldActive] = useState(false);
+  const [inlineNewFieldName, setInlineNewFieldName] = useState('');
+
+  // Custom columns state (persisted in localStorage)
+  const [customColumns, setCustomColumns] = useState<CustomColumn[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('kizuna_custom_columns');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return [
+      { id: 'sad', name: 'sad', type: 'text' },
+      { id: 'asfdfd', name: 'asfdfd', type: 'text' },
+      { id: 'fasfas', name: 'fasfas', type: 'text' },
+    ];
+  });
+
+  const saveCustomColumns = (cols: CustomColumn[]) => {
+    setCustomColumns(cols);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('kizuna_custom_columns', JSON.stringify(cols));
+      } catch {}
+    }
+  };
+
+  const handleCreateCustomField = (field: {
+    title: string;
+    type: any;
+    description?: string;
+    options?: any[];
+  }) => {
+    const newCol: CustomColumn = {
+      id: field.title.toLowerCase().replace(/\s+/g, '-'),
+      name: field.title,
+      type: field.type,
+      options: field.options?.map((o) => o.name),
+    };
+    const updated = [...customColumns, newCol];
+    saveCustomColumns(updated);
+    setToastMessage(`${field.title} added successfully.`);
+    setIsInlineNewFieldActive(true);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === `${field.title} added successfully.` ? null : prev));
+    }, 4000);
+  };
+
+  const handleDeleteCustomColumn = (colId: string) => {
+    const updated = customColumns.filter((c) => c.id !== colId);
+    saveCustomColumns(updated);
+  };
 
   const project = projects.find((p) => p.id === projectId) || projects[0];
 
@@ -403,16 +463,519 @@ export default function ProjectDetailPage() {
         {activeTab === 'List' && (
           <div className="flex flex-col min-h-full justify-between">
             <div>
-              {/* Table Column Headers */}
-              <div className="flex items-center h-[32px] px-4 border-b border-[#2b2c2e] text-[#8a8886] font-semibold text-[11px] uppercase tracking-wider select-none">
+              {/* Table Column Headers with Asana Column Header Menus (matching f_005.jpg & f_025.jpg) */}
+              <div className="flex items-center h-[34px] px-4 border-b border-[#2b2c2e] text-[#8a8886] font-medium text-[12px] select-none">
                 <div className="w-[30px]" />
                 <div className="flex-1 min-w-[200px] pr-4">Name</div>
-                {listColumns.assignee && <div className="w-[160px] hidden md:block px-2">Assignee</div>}
-                {listColumns.dueDate && <div className="w-[130px] hidden sm:block px-2">Due date</div>}
-                {listColumns.priority && <div className="w-[110px] hidden sm:block px-2">Priority</div>}
-                {listColumns.status && <div className="w-[110px] hidden lg:block px-2">Status</div>}
+
+                {/* Assignee Header */}
+                {listColumns.assignee && (
+                  <div className="w-[160px] hidden md:flex items-center relative group/head">
+                    <button
+                      type="button"
+                      onClick={() => setOpenColumnMenu(openColumnMenu === 'assignee' ? null : 'assignee')}
+                      className="flex items-center justify-between w-full px-2 py-1 rounded hover:bg-[#28292c] hover:text-white transition-colors"
+                    >
+                      <span>Assignee</span>
+                      <ChevronDown className="w-3.5 h-3.5 opacity-0 group-hover/head:opacity-100 transition-opacity" />
+                    </button>
+
+                    {/* Column Dropdown Menu (matching f_005.jpg) */}
+                    {openColumnMenu === 'assignee' && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-0 top-full mt-1 w-56 bg-[#252628] border border-[#383a3d] rounded-xl shadow-2xl py-1 z-50 text-[12.5px] text-[#f5f4f3] animate-in fade-in duration-100"
+                      >
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Sort by Assignee');
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <ArrowUpDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                            <span>Sort</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Filter by Assignee');
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <Filter className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Filter</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Group by Assignee');
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Layers className="w-3.5 h-3.5 text-[#8a8886]" />
+                            <span>Group</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            setIsAddFieldModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Add column</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Move column');
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <ArrowUpDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                            <span>Move column</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setListColumns((prev) => ({ ...prev, assignee: false }));
+                            setOpenColumnMenu(null);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <EyeOff className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Hide column</span>
+                        </button>
+
+                        <div className="border-t border-[#37383b] my-1" />
+
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Add automation to Assignee');
+                          }}
+                          className="w-full px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors text-[#bdbbb9]"
+                        >
+                          Add automation to field
+                        </button>
+
+                        <div className="border-t border-[#37383b] my-1" />
+
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Find and replace assignee');
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors text-[#bdbbb9]"
+                        >
+                          <Search className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Find and replace assignee</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Due date Header */}
+                {listColumns.dueDate && (
+                  <div className="w-[130px] hidden sm:flex items-center relative group/head">
+                    <button
+                      type="button"
+                      onClick={() => setOpenColumnMenu(openColumnMenu === 'dueDate' ? null : 'dueDate')}
+                      className="flex items-center justify-between w-full px-2 py-1 rounded hover:bg-[#28292c] hover:text-white transition-colors"
+                    >
+                      <span>Due date</span>
+                      <ChevronDown className="w-3.5 h-3.5 opacity-0 group-hover/head:opacity-100 transition-opacity" />
+                    </button>
+
+                    {openColumnMenu === 'dueDate' && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-0 top-full mt-1 w-52 bg-[#252628] border border-[#383a3d] rounded-xl shadow-2xl py-1 z-50 text-[12.5px] text-[#f5f4f3] animate-in fade-in duration-100"
+                      >
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Sort by Due date');
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <ArrowUpDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                            <span>Sort</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Filter by Due date');
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <Filter className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Filter</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            setIsAddFieldModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Add column</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setListColumns((prev) => ({ ...prev, dueDate: false }));
+                            setOpenColumnMenu(null);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <EyeOff className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Hide column</span>
+                        </button>
+                        <div className="border-t border-[#37383b] my-1" />
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Add automation to Due date');
+                          }}
+                          className="w-full px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors text-[#bdbbb9]"
+                        >
+                          Add automation to field
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Priority Header */}
+                {listColumns.priority && (
+                  <div className="w-[110px] hidden sm:flex items-center relative group/head">
+                    <button
+                      type="button"
+                      onClick={() => setOpenColumnMenu(openColumnMenu === 'priority' ? null : 'priority')}
+                      className="flex items-center justify-between w-full px-2 py-1 rounded hover:bg-[#28292c] hover:text-white transition-colors"
+                    >
+                      <span>Priority</span>
+                      <ChevronDown className="w-3.5 h-3.5 opacity-0 group-hover/head:opacity-100 transition-opacity" />
+                    </button>
+
+                    {openColumnMenu === 'priority' && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-0 top-full mt-1 w-56 bg-[#252628] border border-[#383a3d] rounded-xl shadow-2xl py-1 z-50 text-[12.5px] text-[#f5f4f3] animate-in fade-in duration-100"
+                      >
+                        <button
+                          onClick={() => {
+                            setEditFieldType('Priority');
+                            setIsEditFieldModalOpen(true);
+                            setOpenColumnMenu(null);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Edit field</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Field access and permissions');
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Key className="w-3.5 h-3.5 text-[#8a8886]" />
+                            <span>Field access and permissions</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                        </button>
+                        <div className="border-t border-[#37383b] my-1" />
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Sort by Priority');
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <ArrowUpDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                            <span>Sort</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            setIsAddFieldModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Add column</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setListColumns((prev) => ({ ...prev, priority: false }));
+                            setOpenColumnMenu(null);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <EyeOff className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Hide column</span>
+                        </button>
+                        <div className="border-t border-[#37383b] my-1" />
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Add automation to field');
+                          }}
+                          className="w-full px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors text-[#bdbbb9]"
+                        >
+                          Add automation to field
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            projectTasks.forEach((t) => autoFillTaskStatus(t.id));
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>AI auto-fill</span>
+                        </button>
+                        <div className="border-t border-[#37383b] my-1" />
+                        <button
+                          onClick={() => {
+                            setListColumns((prev) => ({ ...prev, priority: false }));
+                            setOpenColumnMenu(null);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors text-[#ff6b72]"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-[#ff6b72]" />
+                          <span>Delete field</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Status Header (matching f_025.jpg) */}
+                {listColumns.status && (
+                  <div className="w-[110px] hidden lg:flex items-center relative group/head">
+                    <button
+                      type="button"
+                      onClick={() => setOpenColumnMenu(openColumnMenu === 'status' ? null : 'status')}
+                      className="flex items-center justify-between w-full px-2 py-1 rounded hover:bg-[#28292c] hover:text-white transition-colors"
+                    >
+                      <span>Status</span>
+                      <ChevronDown className="w-3.5 h-3.5 opacity-0 group-hover/head:opacity-100 transition-opacity" />
+                    </button>
+
+                    {/* Column Dropdown Menu (matching f_025.jpg) */}
+                    {openColumnMenu === 'status' && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-0 top-full mt-1 w-56 bg-[#252628] border border-[#383a3d] rounded-xl shadow-2xl py-1 z-50 text-[12.5px] text-[#f5f4f3] animate-in fade-in duration-100"
+                      >
+                        <button
+                          onClick={() => {
+                            setEditFieldType('Status');
+                            setIsEditFieldModalOpen(true);
+                            setOpenColumnMenu(null);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Edit field</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Field access and permissions');
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Key className="w-3.5 h-3.5 text-[#8a8886]" />
+                            <span>Field access and permissions</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                        </button>
+                        <div className="border-t border-[#37383b] my-1" />
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Sort by Status');
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <ArrowUpDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                            <span>Sort</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#8a8886]" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            setIsAddFieldModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Add column</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setListColumns((prev) => ({ ...prev, status: false }));
+                            setOpenColumnMenu(null);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <EyeOff className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Hide column</span>
+                        </button>
+                        <div className="border-t border-[#37383b] my-1" />
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            alert('Add automation to field');
+                          }}
+                          className="w-full px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors text-[#bdbbb9]"
+                        >
+                          Add automation to field
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            projectTasks.forEach((t) => autoFillTaskStatus(t.id));
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>AI auto-fill</span>
+                        </button>
+                        <div className="border-t border-[#37383b] my-1" />
+                        <button
+                          onClick={() => {
+                            setListColumns((prev) => ({ ...prev, status: false }));
+                            setOpenColumnMenu(null);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors text-[#ff6b72]"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-[#ff6b72]" />
+                          <span>Delete field</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Dynamic Custom Column Headers (matching f_025.jpg & f_048.jpg) */}
+                {customColumns.map((col) => (
+                  <div
+                    key={col.id}
+                    className="w-[120px] hidden xl:flex items-center relative group/head"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setOpenColumnMenu(openColumnMenu === col.id ? null : col.id)}
+                      className="flex items-center justify-between w-full px-2 py-1 rounded hover:bg-[#28292c] hover:text-white transition-colors"
+                    >
+                      <span className="truncate">{col.name}</span>
+                      <ChevronDown className="w-3.5 h-3.5 opacity-0 group-hover/head:opacity-100 transition-opacity shrink-0" />
+                    </button>
+
+                    {openColumnMenu === col.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-0 top-full mt-1 w-56 bg-[#252628] border border-[#383a3d] rounded-xl shadow-2xl py-1 z-50 text-[12.5px] text-[#f5f4f3] animate-in fade-in duration-100"
+                      >
+                        <button
+                          onClick={() => {
+                            setOpenColumnMenu(null);
+                            setIsAddFieldModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-[#8a8886]" />
+                          <span>Add column</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleDeleteCustomColumn(col.id);
+                            setOpenColumnMenu(null);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#2f3135] text-left transition-colors text-[#ff6b72]"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-[#ff6b72]" />
+                          <span>Delete field</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Inline "New field" placeholder when added (matching f_048.jpg) */}
+                {isInlineNewFieldActive && (
+                  <div className="w-[130px] px-1 flex items-center">
+                    <input
+                      autoFocus
+                      placeholder="New field"
+                      value={inlineNewFieldName}
+                      onChange={(e) => setInlineNewFieldName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          if (inlineNewFieldName.trim()) {
+                            handleCreateCustomField({
+                              title: inlineNewFieldName.trim(),
+                              type: 'text',
+                            });
+                          }
+                          setInlineNewFieldName('');
+                          setIsInlineNewFieldActive(false);
+                        } else if (e.key === 'Escape') {
+                          setInlineNewFieldName('');
+                          setIsInlineNewFieldActive(false);
+                        }
+                      }}
+                      onBlur={() => {
+                        if (inlineNewFieldName.trim()) {
+                          handleCreateCustomField({
+                            title: inlineNewFieldName.trim(),
+                            type: 'text',
+                          });
+                        }
+                        setInlineNewFieldName('');
+                        setIsInlineNewFieldActive(false);
+                      }}
+                      className="w-full bg-[#1e1f21] border border-[#4573d2] rounded-md px-2 py-0.5 text-white text-[12px] outline-none"
+                    />
+                  </div>
+                )}
+
+                {/* + Add Column Button (matching f_038.jpg) */}
                 <div className="w-[30px] flex items-center justify-center">
-                  <Plus className="w-3 h-3 text-[#6d6c6e]" />
+                  <button
+                    type="button"
+                    onClick={() => setIsAddFieldModalOpen(true)}
+                    className="p-1 rounded hover:bg-[#28292c] hover:text-white transition-colors"
+                    title="Add field"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-[#6d6c6e] hover:text-white" />
+                  </button>
                 </div>
               </div>
 
@@ -454,6 +1017,7 @@ export default function ProjectDetailPage() {
                               showDueDateColumn={listColumns.dueDate}
                               showPriorityColumn={listColumns.priority}
                               showStatusColumn={listColumns.status}
+                              customColumns={customColumns}
                               onOpenEditField={(fieldType) => {
                                 setEditFieldType(fieldType);
                                 setIsEditFieldModalOpen(true);
@@ -1356,6 +1920,27 @@ export default function ProjectDetailPage() {
           setTimeout(() => setShareToast(null), 2500);
         }}
       />
+
+      {/* Add Field Modal (matching Asana frame f_038.jpg) */}
+      <AddFieldModal
+        isOpen={isAddFieldModalOpen}
+        onClose={() => setIsAddFieldModalOpen(false)}
+        onCreateField={handleCreateCustomField}
+        workspaceName={currentUser.workspace || 'My workspace'}
+      />
+
+      {/* Toast Notification (matching Asana frame f_048.jpg) */}
+      {toastMessage && (
+        <div className="fixed bottom-6 left-6 z-[90] flex items-center justify-between gap-4 bg-[#1e1f21] border border-[#383a3d] text-white px-3.5 py-2.5 rounded-xl shadow-2xl text-[13px] animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <span>{toastMessage}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-[#8a8886] hover:text-white p-0.5 rounded cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {shareToast && (

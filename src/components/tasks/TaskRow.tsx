@@ -11,6 +11,10 @@ import {
   Lock,
   ArrowRight,
   ChevronDown,
+  GripVertical,
+  ArrowUpRight,
+  Mail,
+  Plus,
 } from 'lucide-react';
 import { Task, PriorityLevel, StatusLevel, CustomColumn, Assignee } from '@/lib/types';
 import { useApp } from '@/context/AppContext';
@@ -64,12 +68,23 @@ export default function TaskRow({
   const [isEditingName, setIsEditingName] = useState(false);
   const [taskName, setTaskName] = useState(task.name);
   const [isAssigneeMenuOpen, setIsAssigneeMenuOpen] = useState(false);
+  const [isInlineAssigneeActive, setIsInlineAssigneeActive] = useState(false);
+  const [assigneeSearch, setAssigneeSearch] = useState('');
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
   const [isPriorityMenuOpen, setIsPriorityMenuOpen] = useState(false);
   const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
   const [editingCustomField, setEditingCustomField] = useState<string | null>(null);
   const [customFieldValue, setCustomFieldValue] = useState('');
+
+  const filteredUsers = [
+    currentUser,
+    ...users.filter((u) => u.email !== currentUser.email),
+  ].filter(
+    (u) =>
+      u.name.toLowerCase().includes(assigneeSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(assigneeSearch.toLowerCase())
+  );
 
   const isMilestone = (task as any).taskType === 'milestone' || task.name.toLowerCase().includes('milestone');
   const isApproval = (task as any).taskType === 'approval' || task.name.toLowerCase().includes('approval');
@@ -165,9 +180,14 @@ export default function TaskRow({
             : 'bg-[#1e1f21] group-hover:bg-[#232427]'
         }`}
       >
+        {/* Drag handle ::: (matching f_018.jpg) */}
+        <div className="w-[18px] shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[#6d6c6e] hover:text-white cursor-grab">
+          <GripVertical className="w-3.5 h-3.5" />
+        </div>
+
         {/* Selection checkbox */}
         <div
-          className="w-[24px] flex items-center justify-center shrink-0"
+          className="w-[22px] flex items-center justify-center shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             onToggleSelect?.();
@@ -205,7 +225,7 @@ export default function TaskRow({
         </div>
 
         {/* Task Name Input or Text */}
-        <div className="flex-1 min-w-0 pr-2 pl-1 flex items-center">
+        <div className="flex-1 min-w-0 pr-2 pl-1 flex items-center justify-between">
           {isEditingName ? (
             <input
               type="text"
@@ -229,7 +249,7 @@ export default function TaskRow({
                 e.stopPropagation();
                 setIsEditingName(true);
               }}
-              className="flex items-center gap-2 truncate"
+              className="flex items-center gap-2 truncate flex-1 min-w-0"
             >
               <span
                 className={`truncate ${
@@ -250,88 +270,85 @@ export default function TaskRow({
                   Approval
                 </span>
               )}
+
+              {/* Open Details Drawer Arrow (matching f_018.jpg) */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openTaskDrawer(task.id);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#2e2f33] text-[#8a8886] hover:text-white transition-opacity ml-auto shrink-0"
+                title="Open details"
+              >
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* 2. ASSIGNEE COLUMN (Matching screenshot media_1793780943197_1575253f.png) */}
+      {/* 2. ASSIGNEE COLUMN (Matching f_010.jpg & f_012.jpg) */}
       {showAssigneeColumn && (
-        <div className="w-[160px] shrink-0 px-2 flex items-center h-full relative">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsAssigneeMenuOpen(!isAssigneeMenuOpen);
-              setIsDateMenuOpen(false);
-              setIsPriorityMenuOpen(false);
-              setIsStatusMenuOpen(false);
-            }}
-            className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-[#28292c] transition-colors max-w-full truncate text-left"
-          >
-            {!isUnassigned ? (
-              <>
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-xs"
-                  style={{ backgroundColor: task.assignee?.avatarColor || '#d84b7f' }}
-                  title={task.assignee?.name}
-                >
-                  {task.assignee?.initials || 'KS'}
-                </div>
-                <span className="text-[13px] text-white truncate font-normal">
-                  {task.assignee?.name}
-                </span>
-              </>
-            ) : (
+        <div className="w-[160px] shrink-0 px-2 flex items-center h-full relative" data-popover>
+          {isInlineAssigneeActive ? (
+            <div className="w-full relative">
+              <div className="flex items-center bg-[#18191b] border border-[#4573d2] rounded-md px-2 py-0.5 w-full">
+                <input
+                  type="text"
+                  autoFocus
+                  value={assigneeSearch}
+                  onChange={(e) => setAssigneeSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (assigneeSearch.trim()) {
+                        const email = assigneeSearch.trim().toLowerCase();
+                        updateTask(task.id, {
+                          assignee: {
+                            name: email.split('@')[0],
+                            initials: email.substring(0, 2).toUpperCase(),
+                            email,
+                          },
+                          assigneeEmail: email,
+                        });
+                      }
+                      setIsInlineAssigneeActive(false);
+                      setIsAssigneeMenuOpen(false);
+                      setAssigneeSearch('');
+                    } else if (e.key === 'Escape') {
+                      setIsInlineAssigneeActive(false);
+                      setIsAssigneeMenuOpen(false);
+                      setAssigneeSearch('');
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      setIsInlineAssigneeActive(false);
+                      setIsAssigneeMenuOpen(false);
+                    }, 200);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="Name or email"
+                  className="w-full bg-transparent text-white text-[12.5px] outline-none placeholder-[#6d6c6e]"
+                />
+              </div>
+
+              {/* Dropdown Menu (matching f_012.jpg) */}
               <div
-                className="w-6 h-6 rounded-full border border-dashed border-[#57585c] flex items-center justify-center text-[#8a8886] hover:border-white hover:text-white transition-colors shrink-0"
-                title="Unassigned"
+                onClick={(e) => e.stopPropagation()}
+                className="absolute left-0 top-full mt-1.5 w-64 bg-[#252628] border border-[#383a3d] rounded-xl shadow-2xl z-50 py-1.5 text-[12.5px] animate-in fade-in duration-100"
               >
-                <User className="w-3 h-3" />
-              </div>
-            )}
-          </button>
-
-          {isAssigneeMenuOpen && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="absolute left-2 top-full mt-1 w-52 bg-[#252628] border border-[#383a3d] rounded-xl shadow-2xl z-50 py-1.5 text-[12.5px] animate-in fade-in zoom-in-95 duration-100"
-            >
-              <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider">
-                Assignee
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  updateTask(task.id, {
-                    assignee: {
-                      name: currentUser.name,
-                      initials: currentUser.initials,
-                      avatarColor: currentUser.avatarColor,
-                      email: currentUser.email,
-                    },
-                    assigneeEmail: currentUser.email,
-                  });
-                  setIsAssigneeMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#2f3135] text-white transition-colors"
-              >
-                <div
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
-                  style={{ backgroundColor: currentUser.avatarColor || '#d84b7f' }}
-                >
-                  {currentUser.initials}
+                <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886]">
+                  Suggested people
                 </div>
-                <span className="truncate">{currentUser.name} (You)</span>
-              </button>
 
-              {users
-                .filter((u) => u.email !== currentUser.email)
-                .map((u) => (
+                {/* Filtered users list */}
+                {filteredUsers.map((u) => (
                   <button
                     key={u.id}
                     type="button"
-                    onClick={() => {
+                    onMouseDown={(e) => {
+                      e.preventDefault();
                       updateTask(task.id, {
                         assignee: {
                           name: u.name,
@@ -341,38 +358,116 @@ export default function TaskRow({
                         },
                         assigneeEmail: u.email,
                       });
+                      setIsInlineAssigneeActive(false);
                       setIsAssigneeMenuOpen(false);
+                      setAssigneeSearch('');
                     }}
-                    className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#2f3135] text-white transition-colors"
+                    className="w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-[#2f3135] text-white transition-colors"
                   >
-                    <div
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
-                      style={{ backgroundColor: u.avatarColor || '#4573d2' }}
-                    >
-                      {u.initials}
+                    <div className="flex items-center gap-2 truncate">
+                      <div
+                        className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+                        style={{ backgroundColor: u.avatarColor || '#4573d2' }}
+                      >
+                        {u.initials}
+                      </div>
+                      <span className="font-medium text-white truncate">{u.name}</span>
                     </div>
-                    <span className="truncate">{u.name}</span>
+                    <span className="text-[11px] text-[#8a8886] truncate max-w-[100px] ml-2">
+                      {u.email}
+                    </span>
                   </button>
                 ))}
 
-              <div className="border-t border-[#37383b] my-1" />
-              <button
-                type="button"
-                onClick={() => {
-                  updateTask(task.id, {
-                    assignee: { name: 'Unassigned', initials: '', isPlaceholder: true },
-                    assigneeEmail: undefined,
-                  });
-                  setIsAssigneeMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#2f3135] text-[#8a8886] hover:text-white transition-colors"
-              >
-                <div className="w-5 h-5 rounded-full border border-dashed border-[#57585c] flex items-center justify-center text-[#8a8886]">
-                  <User className="w-2.5 h-2.5" />
+                <div className="border-t border-[#37383b] my-1.5" />
+
+                <div className="px-3 py-1 text-[11px] font-semibold text-[#8a8886]">
+                  AI Teammates
                 </div>
-                <span>Unassigned</span>
-              </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    updateTask(task.id, {
+                      assignee: {
+                        name: 'AI Agent',
+                        initials: 'AI',
+                        avatarColor: '#ab7ffb',
+                        role: 'AI Teammate',
+                      },
+                    });
+                    setIsInlineAssigneeActive(false);
+                    setIsAssigneeMenuOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#2f3135] text-[#ab7ffb] transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Create and assign AI Teammate</span>
+                </button>
+
+                <div className="border-t border-[#37383b] my-1.5" />
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setIsInlineAssigneeActive(false);
+                    setIsAssigneeMenuOpen(false);
+                    const email = prompt('Enter teammate email to invite:');
+                    if (email) {
+                      updateTask(task.id, {
+                        assignee: {
+                          name: email.split('@')[0],
+                          initials: email.substring(0, 2).toUpperCase(),
+                          email,
+                        },
+                        assigneeEmail: email,
+                      });
+                    }
+                  }}
+                  className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#2f3135] text-[#8a8886] hover:text-white transition-colors"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Invite teammates via email</span>
+                </button>
+              </div>
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsInlineAssigneeActive(true);
+                setIsAssigneeMenuOpen(true);
+                setIsDateMenuOpen(false);
+                setIsPriorityMenuOpen(false);
+                setIsStatusMenuOpen(false);
+              }}
+              className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-[#28292c] transition-colors max-w-full truncate text-left w-full"
+            >
+              {!isUnassigned ? (
+                <>
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-xs"
+                    style={{ backgroundColor: task.assignee?.avatarColor || '#d84b7f' }}
+                    title={task.assignee?.name}
+                  >
+                    {task.assignee?.initials || 'KS'}
+                  </div>
+                  <span className="text-[13px] text-white truncate font-normal">
+                    {task.assignee?.name}
+                  </span>
+                </>
+              ) : (
+                <div
+                  className="w-6 h-6 rounded-full border border-dashed border-[#57585c] flex items-center justify-center text-[#8a8886] hover:border-white hover:text-white transition-colors shrink-0"
+                  title="Unassigned"
+                >
+                  <User className="w-3 h-3" />
+                </div>
+              )}
+            </button>
           )}
         </div>
       )}
