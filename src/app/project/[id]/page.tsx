@@ -39,6 +39,7 @@ import TaskDashboard from '@/components/tasks/TaskDashboard';
 import TaskFiles from '@/components/tasks/TaskFiles';
 import TaskTimeline from '@/components/tasks/TaskTimeline';
 import ListOptionsDrawer from '@/components/tasks/ListOptionsDrawer';
+import CustomizeDrawer from '@/components/layout/CustomizeDrawer';
 import ExploreProjectBar from '@/components/modals/ExploreProjectBar';
 import { StatusLevel, PriorityLevel } from '@/lib/types';
 
@@ -78,6 +79,8 @@ export default function ProjectDetailPage() {
 
   // Customize Drawer State
   const [isOptionsDrawerOpen, setIsOptionsDrawerOpen] = useState(false);
+  const [isCustomizeDrawerOpen, setIsCustomizeDrawerOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [listColumns, setListColumns] = useState<Record<string, boolean>>({
     assignee: true,
     dueDate: true,
@@ -229,7 +232,7 @@ export default function ProjectDetailPage() {
             </button>
 
             <button
-              onClick={() => setIsOptionsDrawerOpen(true)}
+              onClick={() => setIsCustomizeDrawerOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252628] hover:bg-[#2f3135] text-[#f5f4f3] border border-[#37383b] text-[12px] font-medium transition-colors cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -715,7 +718,7 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
-      {/* Customize Options Drawer */}
+      {/* Table Column Options Drawer */}
       <ListOptionsDrawer
         isOpen={isOptionsDrawerOpen}
         onClose={() => setIsOptionsDrawerOpen(false)}
@@ -727,6 +730,13 @@ export default function ProjectDetailPage() {
         onSortFieldChange={() => {}}
         groupField="none"
         onGroupFieldChange={() => {}}
+      />
+
+      {/* Asana Customize Workflow Drawer */}
+      <CustomizeDrawer
+        isOpen={isCustomizeDrawerOpen}
+        onClose={() => setIsCustomizeDrawerOpen(false)}
+        contextTitle={project.name}
       />
     </div>
   );

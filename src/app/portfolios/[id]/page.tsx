@@ -34,9 +34,12 @@ import {
   BarChart2,
   TrendingUp,
   X,
+  Building,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Project, Task, Portfolio } from '@/lib/types';
+import CustomizeDrawer from '@/components/layout/CustomizeDrawer';
 
 export default function PortfolioDetailPage() {
   const params = useParams();
@@ -78,6 +81,12 @@ export default function PortfolioDetailPage() {
   // Add work menu dropdown
   const [isAddWorkOpen, setIsAddWorkOpen] = useState(false);
   const [isAddExistingProjectOpen, setIsAddExistingProjectOpen] = useState(false);
+
+  // Share & Customize modal state
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+  const [shareInviteEmail, setShareInviteEmail] = useState('');
+  const [shareToast, setShareToast] = useState<string | null>(null);
 
   // Messages tab state
   const [messages, setMessages] = useState<
@@ -283,7 +292,7 @@ export default function PortfolioDetailPage() {
             </div>
 
             <button
-              onClick={() => alert("Share portfolio modal")}
+              onClick={() => setIsShareModalOpen(true)}
               className="flex items-center gap-1.5 bg-[#4573d2] hover:bg-[#3562be] text-white px-3.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors shadow-xs cursor-pointer"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -291,7 +300,7 @@ export default function PortfolioDetailPage() {
             </button>
 
             <button
-              onClick={() => alert("Customize portfolio views & fields")}
+              onClick={() => setIsCustomizeOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252628] hover:bg-[#2f3135] text-[#f5f4f3] border border-[#37383b] text-[12px] font-medium transition-colors cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -864,6 +873,223 @@ export default function PortfolioDetailPage() {
               })}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* Share Portfolio Modal (Matching Video & Screenshot)           */}
+      {/* ============================================================== */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-[#1e1f21] border border-[#38393c] rounded-2xl w-full max-w-[540px] p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            {/* Header: Title + Copy link icon + Close button */}
+            <div className="flex items-center justify-between pb-1">
+              <h3 className="text-[18px] font-bold text-white tracking-tight">
+                Share {portfolio.name}
+              </h3>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/portfolios/${portfolio.id}`;
+                    navigator.clipboard.writeText(link);
+                    setShareToast('Portfolio link copied to clipboard');
+                    setTimeout(() => setShareToast(null), 2500);
+                  }}
+                  className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors cursor-pointer"
+                  title="Copy link"
+                >
+                  <LinkIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setIsShareModalOpen(false)}
+                  className="p-1.5 rounded-lg text-[#8a8886] hover:text-white hover:bg-[#28292c] transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Section 1: Invite with email */}
+            <div className="space-y-3">
+              <label className="block text-[13px] font-semibold text-white">
+                Invite with email
+              </label>
+
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center bg-[#141517] border border-[#37383b] focus-within:border-white rounded-xl overflow-hidden px-3.5 py-1.5 transition-colors">
+                  <input
+                    type="text"
+                    value={shareInviteEmail}
+                    onChange={(e) => setShareInviteEmail(e.target.value)}
+                    placeholder="Add people, emails, or teams..."
+                    className="bg-transparent text-[13.5px] text-white placeholder-[#717377] focus:outline-none flex-1 py-1"
+                  />
+                  <div className="flex items-center gap-1 text-[13px] text-[#cfcecd] hover:text-white cursor-pointer px-2 py-0.5 rounded">
+                    <span>Editor</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                  </div>
+                </div>
+
+                <button
+                  disabled={!shareInviteEmail.trim()}
+                  onClick={() => {
+                    if (!shareInviteEmail.trim()) return;
+                    setShareToast(`Invited ${shareInviteEmail.trim()} to portfolio`);
+                    setShareInviteEmail('');
+                    setTimeout(() => setShareToast(null), 2500);
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
+                    shareInviteEmail.trim()
+                      ? 'bg-[#4573d2] hover:bg-[#3b66be] text-white cursor-pointer'
+                      : 'bg-[#252628] text-[#5d5f63] cursor-not-allowed border border-[#303236]'
+                  }`}
+                >
+                  Invite
+                </button>
+              </div>
+
+              {/* Checkboxes */}
+              <div className="space-y-2 pt-1">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="mt-0.5 rounded border-[#3a3b3e] bg-[#141517] text-[#4573d2] focus:ring-0 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-[13px] text-white font-normal leading-tight">
+                      Give access to all projects in this portfolio that I can share
+                    </div>
+                    <div className="text-[12px] text-[#8a8886] mt-0.5">
+                      Users will get up to the project's default access level
+                    </div>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="rounded border-[#3a3b3e] bg-[#141517] text-[#4573d2] focus:ring-0 cursor-pointer"
+                  />
+                  <span className="text-[13px] text-white font-normal leading-tight">
+                    Notify when work is added to the portfolio
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="border-t border-[#2e2f32]" />
+
+            {/* Section 2: Access settings */}
+            <div className="space-y-2">
+              <label className="block text-[13px] font-semibold text-white">
+                Access settings
+              </label>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[#141517] border border-[#2e3034] hover:border-[#38393c] cursor-pointer transition-colors">
+                <div className="flex items-center gap-2.5 text-[13.5px] text-white font-medium">
+                  <Building className="w-4 h-4 text-[#8a8886]" />
+                  <span>My workspace</span>
+                </div>
+                <ChevronDown className="w-4 h-4 text-[#8a8886]" />
+              </div>
+            </div>
+
+            {/* Section 3: Who has access */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-semibold text-white">Who has access</span>
+                <button
+                  onClick={() => alert("Notification preferences for portfolio updates")}
+                  className="text-[13px] text-[#4573d2] hover:underline cursor-pointer font-medium"
+                >
+                  Manage notifications
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                {/* Everyone at My workspace */}
+                <div className="flex items-center justify-between py-2 px-1">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-[#252628] border border-[#37383b] flex items-center justify-center text-[#8a8886]">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-[13.5px] font-medium text-white">
+                        Everyone at My workspace
+                      </div>
+                      <div className="text-[11.5px] text-[#8a8886]">
+                        Your organization
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[13px] text-[#cfcecd] hover:text-white cursor-pointer px-2 py-1 rounded">
+                    <span>Editor</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                  </div>
+                </div>
+
+                {/* Kevin Safrisal */}
+                <div className="flex items-center justify-between py-2 px-1">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-xs"
+                      style={{ backgroundColor: portfolio.owner?.avatarColor || '#d84b7f' }}
+                    >
+                      {portfolio.owner?.initials || currentUser.initials}
+                    </div>
+                    <div>
+                      <div className="text-[13.5px] font-medium text-white">
+                        {portfolio.owner?.name || currentUser.name}
+                      </div>
+                      <div className="text-[11.5px] text-[#8a8886]">
+                        kevinsafrisal@gmail.com
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[13px] text-[#cfcecd] hover:text-white cursor-pointer px-2 py-1 rounded">
+                    <span>Portfolio admin</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-[#8a8886]" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer: Copy portfolio link button */}
+            <div className="flex justify-end pt-2 border-t border-[#2e2f32]">
+              <button
+                onClick={() => {
+                  const link = `${window.location.origin}/portfolios/${portfolio.id}`;
+                  navigator.clipboard.writeText(link);
+                  setShareToast('Portfolio link copied to clipboard');
+                  setTimeout(() => setShareToast(null), 2500);
+                }}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#252628] hover:bg-[#2e3034] border border-[#37383b] text-white text-[13px] font-medium transition-colors cursor-pointer"
+              >
+                <LinkIcon className="w-4 h-4 text-[#cfcecd]" />
+                <span>Copy portfolio link</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* Customize Right-Side Drawer                                    */}
+      {/* ============================================================== */}
+      <CustomizeDrawer
+        isOpen={isCustomizeOpen}
+        onClose={() => setIsCustomizeOpen(false)}
+        contextTitle={portfolio.name}
+      />
+
+      {/* Toast Notification */}
+      {shareToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#141517] border border-[#37383b] text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-[13px] animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <Check className="w-4 h-4 text-[#4cd195]" />
+          <span>{shareToast}</span>
         </div>
       )}
     </div>

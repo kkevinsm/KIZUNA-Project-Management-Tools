@@ -12,11 +12,15 @@ import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskCalendar from '@/components/tasks/TaskCalendar';
 import TaskDashboard from '@/components/tasks/TaskDashboard';
 import TaskFiles from '@/components/tasks/TaskFiles';
+import ManagePrivacyModal from '@/components/modals/ManagePrivacyModal';
+import CustomizeDrawer from '@/components/layout/CustomizeDrawer';
 
 export default function MyTasksPage() {
   const { tasks, currentUser, viewConfigs } = useApp();
 
   const [activeTab, setActiveTab] = useState<'List' | 'Board' | 'Calendar' | 'Dashboard' | 'Files'>('List');
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const sections = ['Recently assigned', 'Do today', 'Do next week', 'Do later'];
 
   return (
@@ -41,15 +45,15 @@ export default function MyTasksPage() {
           {/* Action buttons: Share & Customize */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => alert('Share settings for My Tasks')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252628] hover:bg-[#2f3135] text-[#f5f4f3] border border-[#37383b] text-[12px] font-medium transition-colors"
+              onClick={() => setIsPrivacyModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252628] hover:bg-[#2f3135] text-[#f5f4f3] border border-[#37383b] text-[12px] font-medium transition-colors cursor-pointer"
             >
               <Share2 className="w-3.5 h-3.5" />
               <span>Share</span>
             </button>
             <button
-              onClick={() => alert('Customize My Tasks')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252628] hover:bg-[#2f3135] text-[#f5f4f3] border border-[#37383b] text-[12px] font-medium transition-colors"
+              onClick={() => setIsCustomizeOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252628] hover:bg-[#2f3135] text-[#f5f4f3] border border-[#37383b] text-[12px] font-medium transition-colors cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
               <span>Customize</span>
@@ -100,6 +104,19 @@ export default function MyTasksPage() {
 
           {activeTab === 'Files' && <TaskFiles tasks={tasks} projectName="My tasks" />}
         </div>
+
+        {/* Share: Manage Privacy Modal (matching Video 3 frame 005-015) */}
+        <ManagePrivacyModal
+          isOpen={isPrivacyModalOpen}
+          onClose={() => setIsPrivacyModalOpen(false)}
+        />
+
+        {/* Customize Right-Side Drawer (matching Video 3 frame 020-068) */}
+        <CustomizeDrawer
+          isOpen={isCustomizeOpen}
+          onClose={() => setIsCustomizeOpen(false)}
+          contextTitle="My tasks"
+        />
       </div>
       );
 }
