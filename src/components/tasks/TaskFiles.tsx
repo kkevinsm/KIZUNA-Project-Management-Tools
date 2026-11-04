@@ -30,6 +30,7 @@ import {
   Clock,
   User,
   Folder,
+  Loader2,
 } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { useApp } from '@/context/AppContext';
@@ -46,6 +47,7 @@ export interface DashboardFile {
   thumbnailUrl?: string;
   uploadedAt: string;
   lastModified: string;
+  r2Key?: string;
 }
 
 interface TaskFilesProps {
@@ -85,6 +87,7 @@ export default function TaskFiles({ tasks, projectName = 'My Tasks' }: TaskFiles
   const [isAddFileOpen, setIsAddFileOpen] = useState(false);
   const [activeAddTab, setActiveAddTab] = useState<'upload' | 'google_drive' | 'onedrive' | 'box' | 'dropbox'>('upload');
   const [googleDriveUrl, setGoogleDriveUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
@@ -175,35 +178,120 @@ export default function TaskFiles({ tasks, projectName = 'My Tasks' }: TaskFiles
     return 'other';
   };
 
-  // Handle uploading real files
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Fetch files from Cloudflare R2 on mount and merge
+  useEffect(() => {
+    async function loadR2Files() {
+      try {
+        const res = await fetch('/api/storage?action=list');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.files && Array.isArray(data.files) && data.files.length > 0) {
+            setFiles((prev) => {
+              const existingKeys = new Set(prev.map((f) => f.r2Key).filter(Boolean));
+              const newR2Entries: DashboardFile[] = [];
+
+              data.files.forEach((rf: { key: string; name?: string; size: number; lastModified: string; url?: string }) => {
+                if (!existingKeys.has(rf.key)) {
+                  const fileName = rf.name || rf.key.split('/').pop() || 'Untitled File';
+                  const type = getFileTypeCategory(fileName);
+                  newR2Entries.push({
+                    id: `r2-${rf.key.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+                    name: fileName,
+                    size: rf.size,
+                    fileType: type,
+                    fileSource: 'project',
+                    attachedToName: projectName,
+                    url: rf.url || `/api/storage?key=${encodeURIComponent(rf.key)}`,
+                    thumbnailUrl: type === 'image' ? (rf.url || `/api/storage?key=${encodeURIComponent(rf.key)}`) : undefined,
+                    uploadedAt: new Date(rf.lastModified).toLocaleDateString() + ' ' + new Date(rf.lastModified).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    lastModified: new Date(rf.lastModified).toLocaleDateString() + ' ' + new Date(rf.lastModified).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    r2Key: rf.key,
+                  });
+                }
+              });
+
+              if (newR2Entries.length > 0) {
+                const combined = [...newR2Entries, ...prev];
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('kizuna_dashboard_files', JSON.stringify(combined));
+                }
+                return combined;
+              }
+              return prev;
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load R2 files:', err);
+      }
+    }
+    loadR2Files();
+  }, [projectName]);
+
+  // Handle uploading real files directly to Cloudflare R2
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFiles = e.target.files;
     if (!uploadedFiles || uploadedFiles.length === 0) return;
 
+    setIsUploading(true);
     const newEntries: DashboardFile[] = [];
 
-    Array.from(uploadedFiles).forEach((file) => {
+    for (const file of Array.from(uploadedFiles)) {
       const type = getFileTypeCategory(file.name);
-      let thumbUrl: string | undefined = undefined;
-      if (file.type.startsWith('image/')) {
-        thumbUrl = URL.createObjectURL(file);
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('taskId', 'my-tasks');
+
+        const res = await fetch('/api/storage', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const fileUrl = data.url || (file.type.startsWith('image/') ? URL.createObjectURL(file) : '#');
+          newEntries.push({
+            id: `file-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            name: file.name,
+            size: file.size,
+            fileType: type,
+            fileSource: 'project',
+            attachedToName: projectName,
+            url: fileUrl,
+            thumbnailUrl: (file.type.startsWith('image/') || type === 'image') ? fileUrl : undefined,
+            uploadedAt: 'Today at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            lastModified: 'Today at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            r2Key: data.key,
+          });
+        } else {
+          throw new Error('Upload response error');
+        }
+      } catch (err) {
+        console.error('Error uploading file to Cloudflare R2, falling back to local object URL:', err);
+        let thumbUrl: string | undefined = undefined;
+        if (file.type.startsWith('image/')) {
+          thumbUrl = URL.createObjectURL(file);
+        }
+        newEntries.push({
+          id: `file-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          name: file.name,
+          size: file.size,
+          fileType: type,
+          fileSource: 'project',
+          attachedToName: projectName,
+          url: thumbUrl || '#',
+          thumbnailUrl: thumbUrl,
+          uploadedAt: 'Today at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          lastModified: 'Today at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        });
       }
+    }
 
-      newEntries.push({
-        id: `file-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        name: file.name,
-        size: file.size,
-        fileType: type,
-        fileSource: 'project',
-        attachedToName: projectName,
-        url: thumbUrl || '#',
-        thumbnailUrl: thumbUrl,
-        uploadedAt: 'Today at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        lastModified: 'Today at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      });
-    });
-
-    persistFiles([...newEntries, ...files]);
+    if (newEntries.length > 0) {
+      persistFiles([...newEntries, ...files]);
+    }
+    setIsUploading(false);
     setIsAddFileOpen(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -228,7 +316,17 @@ export default function TaskFiles({ tasks, projectName = 'My Tasks' }: TaskFiles
     setIsAddFileOpen(false);
   };
 
-  const handleDeleteFile = (id: string) => {
+  const handleDeleteFile = async (id: string) => {
+    const fileToDelete = files.find((f) => f.id === id);
+    if (fileToDelete?.r2Key) {
+      try {
+        await fetch(`/api/storage?key=${encodeURIComponent(fileToDelete.r2Key)}`, {
+          method: 'DELETE',
+        });
+      } catch (err) {
+        console.error('Failed to delete file from Cloudflare R2:', err);
+      }
+    }
     persistFiles(files.filter((f) => f.id !== id));
   };
 
@@ -417,10 +515,12 @@ export default function TaskFiles({ tasks, projectName = 'My Tasks' }: TaskFiles
                     </p>
                     <button
                       type="button"
+                      disabled={isUploading}
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-1.5 rounded-lg bg-[#4573d2] hover:bg-[#3562be] text-white text-[12.5px] font-medium transition-colors cursor-pointer shadow-sm"
+                      className="px-4 py-1.5 rounded-lg bg-[#4573d2] hover:bg-[#3562be] disabled:opacity-60 text-white text-[12.5px] font-medium transition-colors cursor-pointer shadow-sm flex items-center gap-2"
                     >
-                      Choose a file
+                      {isUploading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      {isUploading ? 'Uploading to R2...' : 'Choose a file'}
                     </button>
                   </div>
                 )}

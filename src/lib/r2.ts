@@ -88,10 +88,21 @@ export async function listR2Files() {
   });
 
   const response = await client.send(command);
-  return (response.Contents || []).map((item) => ({
-    key: item.Key || '',
-    size: item.Size || 0,
-    lastModified: item.LastModified?.toISOString() || new Date().toISOString(),
-  }));
+  const publicUrlBase = process.env.CLOUDFLARE_R2_PUBLIC_URL?.replace(/\/$/, '');
+
+  return (response.Contents || [])
+    .filter((item) => !item.Key?.startsWith('kizuna/database/'))
+    .map((item) => {
+      const key = item.Key || '';
+      const name = key.split('/').pop()?.replace(/^\d+-/, '') || key;
+      const url = publicUrlBase ? `${publicUrlBase}/${key}` : `/api/storage?key=${encodeURIComponent(key)}`;
+      return {
+        key,
+        name,
+        size: item.Size || 0,
+        lastModified: item.LastModified?.toISOString() || new Date().toISOString(),
+        url,
+      };
+    });
 }
 
