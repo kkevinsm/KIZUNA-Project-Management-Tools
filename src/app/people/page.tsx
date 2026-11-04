@@ -17,7 +17,6 @@ import {
   ChevronRight,
   Pin,
   ExternalLink,
-  Award,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import EditProfileModal from '@/components/modals/EditProfileModal';
@@ -405,29 +404,6 @@ export default function PeopleProfilePage() {
                 </p>
               </div>
             )}
-          </div>
-
-          {/* Card 3: Asana Academy / Skills & Certifications (From Video frame 054) */}
-          <div className="bg-[#252628] border border-[#2e3034] rounded-2xl p-5 space-y-3 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Award className="w-4 h-4 text-[#9b6ade]" />
-                <h3 className="text-[13.5px] font-bold text-white tracking-tight">
-                  Skills & Certifications
-                </h3>
-              </div>
-              <span className="text-[11.5px] text-[#8a8886]">0 earned</span>
-            </div>
-
-            <div className="p-3 rounded-xl bg-[#1e1f21] border border-[#2e3034] flex items-center justify-between">
-              <div>
-                <div className="text-[12.5px] font-semibold text-white">Asana Administrator</div>
-                <div className="text-[11px] text-[#8a8886]">Core platform governance</div>
-              </div>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#2a2b2e] text-[#8a8886] font-medium">
-                Not started
-              </span>
-            </div>
           </div>
         </div>
       </div>
