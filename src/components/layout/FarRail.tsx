@@ -116,11 +116,8 @@ export default function FarRail() {
                 {currentUser.initials}
               </div>
               <div className="truncate">
-                <div className="font-semibold text-white truncate flex items-center gap-1.5">
-                  <span>{currentUser.name}</span>
-                  <span className="text-[10px] bg-[#333538] text-[#bdbbb9] px-1.5 py-0.2 rounded font-normal">
-                    {currentUser.role || 'Member'}
-                  </span>
+                <div className="font-semibold text-white truncate">
+                  {currentUser.name}
                 </div>
                 <div className="text-[11px] text-[#8a8886] truncate">{currentUser.email}</div>
               </div>
