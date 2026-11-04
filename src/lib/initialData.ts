@@ -28,7 +28,7 @@ export const INITIAL_PROJECTS: Project[] = [
         avatarColor: '#d84b7f',
       },
     ],
-    portfolios: [],
+    portfolios: ['My first portfolio'],
     lastModified: 'Just now',
     description: 'Welcome to your first project! Track work, assign due dates, and collaborate.',
     sections: ['To do', 'Doing', 'Done'],
