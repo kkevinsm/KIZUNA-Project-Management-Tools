@@ -54,6 +54,8 @@ interface AppContextType {
   inviteUser: (name: string, email: string) => UserAccount;
   inviteTeammates: (emails: string[], projectIds?: string[]) => { addedCount: number; existingCount: number };
   shareProject: (projectId: string, email: string, role?: string) => { success: boolean; user?: UserAccount; error?: string };
+  updateProjectMemberRole: (projectId: string, email: string, role: string) => void;
+  removeProjectMember: (projectId: string, email: string) => void;
   sharePortfolio: (portfolioId: string, email: string, role?: string, includeProjects?: boolean) => { success: boolean; user?: UserAccount; error?: string };
   shareMyTasks: (email: string, role?: string) => { success: boolean; user?: UserAccount; error?: string };
   setSearchQuery: (query: string) => void;
@@ -1204,6 +1206,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true, user: targetUser };
   };
 
+  const updateProjectMemberRole = (projectId: string, email: string, role: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    setAllProjects((prev) =>
+      prev.map((p) => {
+        if (p.id !== projectId) return p;
+        const members = p.members.map((m) =>
+          m.email?.toLowerCase() === cleanEmail ? { ...m, role } : m
+        );
+        return { ...p, members };
+      })
+    );
+  };
+
+  const removeProjectMember = (projectId: string, email: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    setAllProjects((prev) =>
+      prev.map((p) => {
+        if (p.id !== projectId) return p;
+        const memberEmails = (p.memberEmails || []).filter((e) => e.toLowerCase() !== cleanEmail);
+        const members = p.members.filter((m) => m.email?.toLowerCase() !== cleanEmail);
+        return { ...p, memberEmails, members };
+      })
+    );
+  };
+
   // Share a portfolio (and optionally its projects) with an email
   const sharePortfolio = (portfolioId: string, email: string, role = 'Editor', includeProjects = true) => {
     const cleanEmail = email.trim().toLowerCase();
@@ -1859,6 +1886,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         closeInviteModal,
         inviteTeammates,
         shareProject,
+        updateProjectMemberRole,
+        removeProjectMember,
         sharePortfolio,
         shareMyTasks,
         login,

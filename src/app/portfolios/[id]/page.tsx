@@ -284,12 +284,23 @@ export default function PortfolioDetailPage() {
 
           {/* Right Action buttons */}
           <div className="flex items-center gap-2">
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-xs shrink-0 cursor-pointer"
-              style={{ backgroundColor: portfolio.owner?.avatarColor || '#d84b7f' }}
-              title={portfolio.owner?.name || currentUser.name}
-            >
-              {portfolio.owner?.initials || currentUser.initials}
+            <div className="flex items-center gap-1">
+              <div
+                onClick={() => setIsShareModalOpen(true)}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-xs shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: portfolio.owner?.avatarColor || '#d84b7f' }}
+                title={portfolio.owner?.name || currentUser.name}
+              >
+                {portfolio.owner?.initials || currentUser.initials}
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsShareModalOpen(true)}
+                title="Manage portfolio members"
+                className="w-7 h-7 rounded-full bg-[#2a2b2e] hover:bg-[#343539] border border-[#37383b] flex items-center justify-center text-[#8a8886] hover:text-white cursor-pointer transition-colors"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
             </div>
 
             <button
