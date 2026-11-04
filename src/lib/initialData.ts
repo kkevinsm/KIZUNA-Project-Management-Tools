@@ -14,6 +14,13 @@ export const INITIAL_USERS: UserAccount[] = [
     department: '',
     aboutMe: '',
     isOutOfOffice: false,
+    licenseTier: 'Advanced',
+    aiSpendingEnabled: true,
+    userStatus: 'Active',
+    userType: 'Member',
+    invitedBy: 'Joined independently',
+    invitedDate: '-',
+    lastActivity: 'Today',
   },
 ];
 

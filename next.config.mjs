@@ -11,6 +11,10 @@ const nextConfig = {
   images: {
     domains: ["localhost", "asanausercontent.com"],
   },
+  webpack: (config) => {
+    config.resolve.modules = [path.resolve(__dirname, 'node_modules')];
+    return config;
+  },
 };
 
 export default nextConfig;

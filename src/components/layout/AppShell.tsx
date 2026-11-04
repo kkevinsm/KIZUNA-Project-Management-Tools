@@ -16,6 +16,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isHydrated } = useApp();
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
+  const isAdminPage = pathname?.startsWith('/admin');
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -54,6 +55,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <span className="w-3.5 h-3.5 rounded-full bg-[#f06a6a]"></span>
         </div>
         <span className="text-[13px] font-medium text-[#8a8886]">Redirecting to login...</span>
+      </div>
+    );
+  }
+
+  // Admin pages have their own standalone console layout
+  if (isAdminPage) {
+    return (
+      <div className="h-screen w-screen bg-[#1e1f21] text-[#f5f4f3] flex flex-col overflow-hidden">
+        {children}
+        <InviteModal />
       </div>
     );
   }

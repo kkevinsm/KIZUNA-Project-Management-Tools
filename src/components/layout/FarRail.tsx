@@ -152,7 +152,7 @@ export default function FarRail() {
               <button
                 onClick={() => {
                   setIsMenuOpen(false);
-                  alert('Admin console: Workspace settings & access controls');
+                  router.push('/admin');
                 }}
                 className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
               >

@@ -91,6 +91,9 @@ interface AppContextType {
   addTeamMessage: (title: string, content: string) => void;
   teamDescription: string;
   setTeamDescription: (desc: string) => void;
+  allUsers: UserAccount[];
+  updateUserAccount: (userId: string, data: Partial<UserAccount>) => void;
+  updateWorkspaceName: (name: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -1022,8 +1025,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           password: 'password123',
           initials: getInitials(displayName),
           avatarColor: color,
-          workspace: 'My workspace',
-          role: 'Invited',
+          workspace: currentUser.workspace || 'My workspace',
+          role: 'Member',
+          userType: 'Invited',
+          userStatus: 'Invited',
+          licenseTier: 'Advanced',
+          aiSpendingEnabled: true,
+          invitedBy: currentUser.name || 'Admin',
+          invitedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          lastActivity: '-',
           collaboratorEmails: [myEmail],
           sharedTaskAccessEmails: [],
         };
@@ -1517,6 +1527,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const updateUserAccount = (userId: string, data: Partial<UserAccount>) => {
+    setAllUsers((prevUsers) =>
+      prevUsers.map((u) => {
+        if (u.id === userId) {
+          const updated = { ...u, ...data };
+          if (currentUser.id === userId) {
+            setCurrentUser(updated);
+          }
+          return updated;
+        }
+        return u;
+      })
+    );
+  };
+
+  const updateWorkspaceName = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setCurrentUser((prev) => ({ ...prev, workspace: trimmed }));
+    setAllUsers((prev) => prev.map((u) => ({ ...u, workspace: trimmed })));
+  };
+
   const createGoal = (goalData: { title: string; timePeriod?: string; privacy?: string }) => {
     const newGoal: Goal = {
       id: `goal-${Date.now()}`,
@@ -1617,6 +1649,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addTeamMessage,
         teamDescription,
         setTeamDescription,
+        allUsers,
+        updateUserAccount,
+        updateWorkspaceName,
       }}
     >
       {children}

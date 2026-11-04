@@ -19,6 +19,13 @@ export interface UserAccount {
   outOfOfficeNote?: string;
   collaboratorEmails?: string[];
   sharedTaskAccessEmails?: string[];
+  licenseTier?: string;
+  aiSpendingEnabled?: boolean;
+  userStatus?: 'Active' | 'Invited' | 'Suspended';
+  userType?: 'Member' | 'Admin' | 'Guest' | 'Invited';
+  invitedBy?: string;
+  invitedDate?: string;
+  lastActivity?: string;
 }
 
 export interface Goal {
