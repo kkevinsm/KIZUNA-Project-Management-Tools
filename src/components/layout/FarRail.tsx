@@ -124,19 +124,6 @@ export default function FarRail() {
             ref={menuRef}
             className="absolute left-[64px] bottom-0 w-72 bg-[#222325] border border-[#37383b] rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-150 text-[13px] select-none"
           >
-            {/* 1. Yellow trial banner */}
-            <div className="bg-[#42310a] text-[#facc15] px-3.5 py-2 text-[12px] font-medium flex items-center justify-between border-b border-[#5c440a]">
-              <span>14 days left in trial.</span>
-              <button
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  openSettingsModal('account');
-                }}
-                className="underline hover:text-white transition-colors cursor-pointer text-[12px]"
-              >
-                Learn more
-              </button>
-            </div>
 
             {/* 2. User info */}
             <div className="p-3 pb-2">
