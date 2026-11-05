@@ -15,6 +15,17 @@ import {
 } from '@/lib/types';
 import { INITIAL_TASKS, INITIAL_PROJECTS, INITIAL_USERS, INITIAL_PORTFOLIOS } from '@/lib/initialData';
 
+export type SettingsTab =
+  | 'profile'
+  | 'personalization'
+  | 'notifications'
+  | 'emailForwarding'
+  | 'account'
+  | 'display'
+  | 'navigation'
+  | 'integrations'
+  | 'hacks';
+
 interface AppContextType {
   tasks: Task[];
   projects: Project[];
@@ -30,6 +41,11 @@ interface AppContextType {
   isInviteModalOpen: boolean;
   openInviteModal: () => void;
   closeInviteModal: () => void;
+  isSettingsOpen: boolean;
+  settingsTab: SettingsTab;
+  openSettingsModal: (tab?: SettingsTab) => void;
+  closeSettingsModal: () => void;
+  updateCurrentUser: (updates: Partial<UserAccount>) => void;
   login: (email: string, password?: string) => { success: boolean; error?: string };
   loginWithGoogle: (customGoogleAccount?: { name: string; email: string; picture?: string }) => { success: boolean };
   signup: (name: string, email: string, password?: string) => { success: boolean; error?: string };
@@ -105,6 +121,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [createModalType, setCreateModalType] = useState<'task' | 'project'>('task');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile');
   const [isHydrated, setIsHydrated] = useState(false);
   const [viewConfigs, setViewConfigs] = useState<Record<string, { name: string; icon?: string }>>({
     List: { name: 'List', icon: '' },
@@ -458,6 +476,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsCreateModalOpen(false);
   };
 
+  const openSettingsModal = useCallback((tab?: SettingsTab) => {
+    if (tab) setSettingsTab(tab);
+    setIsSettingsOpen(true);
+  }, []);
+
+  const closeSettingsModal = useCallback(() => {
+    setIsSettingsOpen(false);
+  }, []);
+
+  const updateCurrentUser = useCallback((updates: Partial<UserAccount>) => {
+    setCurrentUser((prev) => {
+      const updated = { ...prev, ...updates };
+      setUsers((all) => all.map((u) => (u.id === prev.id ? updated : u)));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('kizuna_current_user_id', updated.id);
+      }
+      return updated;
+    });
+  }, []);
+
   const createTask = ({
     name,
     section = 'To do',
@@ -694,6 +732,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isInviteModalOpen,
         openInviteModal,
         closeInviteModal,
+        isSettingsOpen,
+        settingsTab,
+        openSettingsModal,
+        closeSettingsModal,
+        updateCurrentUser,
         inviteTeammates,
         login,
         loginWithGoogle,
