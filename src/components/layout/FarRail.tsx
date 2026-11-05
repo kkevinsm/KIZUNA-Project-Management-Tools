@@ -19,6 +19,7 @@ import {
   Settings,
   ArrowRight,
   Check,
+  User,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
@@ -27,12 +28,16 @@ export default function FarRail() {
   const pathname = usePathname();
   const {
     currentUser,
+    users,
+    switchUser,
     logout,
     openInviteModal,
     updateUserProfile,
     workspaces,
     switchWorkspace,
     openCreateWorkspaceModal,
+    openSettingsModal,
+    openCreateModal,
   } = useApp();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -113,26 +118,40 @@ export default function FarRail() {
           {currentUser.initials}
         </button>
 
-        {/* User Profile Popover Menu (Matching app.asana.com) */}
+        {/* User Profile Popover Menu */}
         {isMenuOpen && (
           <div
             ref={menuRef}
-            className="absolute left-[64px] bottom-1 w-[260px] bg-[#1e1f21] border border-[#333538] rounded-2xl shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-150 text-[13.5px] select-none"
+            className="absolute left-[64px] bottom-0 w-72 bg-[#222325] border border-[#37383b] rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-150 text-[13px] select-none"
           >
-            {/* Header info */}
-            <div className="p-1 mb-2">
+            {/* 1. Yellow trial banner */}
+            <div className="bg-[#42310a] text-[#facc15] px-3.5 py-2 text-[12px] font-medium flex items-center justify-between border-b border-[#5c440a]">
+              <span>14 days left in trial.</span>
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  openSettingsModal('account');
+                }}
+                className="underline hover:text-white transition-colors cursor-pointer text-[12px]"
+              >
+                Learn more
+              </button>
+            </div>
+
+            {/* 2. User info */}
+            <div className="p-3 pb-2">
               <div className="flex items-center gap-3 mb-2.5">
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-[#1e1f21] text-[14px] font-bold shrink-0 shadow-xs"
-                  style={{ backgroundColor: '#f5a3bf' }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white text-[13px] font-bold shrink-0 shadow-xs"
+                  style={{ backgroundColor: currentUser.avatarColor || '#8b5cf6' }}
                 >
                   {currentUser.initials}
                 </div>
-                <div className="truncate">
-                  <div className="font-semibold text-white text-[15px] truncate">
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-white text-[14px] truncate leading-tight">
                     {currentUser.name}
                   </div>
-                  <div className="text-[12.5px] text-[#8a8886] truncate">
+                  <div className="text-[12px] text-[#8a8886] truncate mt-0.5">
                     {currentUser.email}
                   </div>
                 </div>
@@ -149,126 +168,163 @@ export default function FarRail() {
                     });
                   }
                 }}
-                className="w-full border border-[#38393c] hover:border-[#4f5156] bg-[#252628] hover:bg-[#2b2c2e] text-white text-[13px] py-1.5 px-3 rounded-lg flex items-center gap-2.5 transition-colors cursor-pointer"
+                className="w-full py-1.5 px-3 rounded-lg border border-[#3b3c3e] bg-[#222325] hover:bg-[#2c2d30] text-white text-[12px] font-medium flex items-center gap-2 transition-colors cursor-pointer mb-2"
               >
-                <Calendar className="w-4 h-4 text-[#cfcecd]" />
+                <Calendar className="w-3.5 h-3.5 text-[#8a8886]" />
                 <span>{currentUser.isOutOfOffice ? 'Clear out of office' : 'Set out of office'}</span>
               </button>
-            </div>
 
-            {/* Workspaces List Section */}
-            <div className="border-t border-[#2e2f32] py-1.5 space-y-0.5">
-              <div className="px-2.5 py-1 text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider">
-                Workspaces
-              </div>
-              {workspaces.map((ws) => {
-                const isActive = (currentUser.workspace || 'My workspace') === ws;
-                return (
-                  <button
-                    key={ws}
-                    onClick={() => {
-                      switchWorkspace(ws);
-                      setIsMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
-                      isActive
-                        ? 'bg-[#2b2c2e] text-white font-medium'
-                        : 'text-[#bdbbb9] hover:bg-[#252628] hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                      <div className="w-4 h-4 rounded bg-[#38393c] text-[9px] font-bold text-white flex items-center justify-center shrink-0">
-                        {ws.charAt(0).toUpperCase()}
+              {/* Workspaces List Section */}
+              <div className="border-t border-[#37383b] py-1.5 space-y-0.5">
+                <div className="px-2 py-0.5 text-[11px] font-semibold text-[#8a8886] uppercase tracking-wider">
+                  Workspaces
+                </div>
+                {workspaces.map((ws) => {
+                  const isActive = (currentUser.workspace || 'My workspace') === ws;
+                  return (
+                    <button
+                      key={ws}
+                      onClick={() => {
+                        switchWorkspace(ws);
+                        setIsMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                        isActive
+                          ? 'bg-[#2b2c2e] text-white font-medium'
+                          : 'text-[#bdbbb9] hover:bg-[#252628] hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <div className="w-4 h-4 rounded bg-[#38393c] text-[9px] font-bold text-white flex items-center justify-center shrink-0">
+                          {ws.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="truncate text-[13px]">{ws}</span>
                       </div>
-                      <span className="truncate text-[13px]">{ws}</span>
+                      {isActive && (
+                        <Check className="w-4 h-4 text-[#2ecc71] shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="border-t border-[#37383b] my-1.5" />
+
+              {/* Menu items */}
+              <div className="space-y-0.5 text-[13px]">
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    router.push('/admin');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#cfcecd] hover:text-white hover:bg-[#2c2d30] transition-colors text-left cursor-pointer"
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-[#8a8886]" />
+                  <span>Admin console</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    openCreateWorkspaceModal();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#cfcecd] hover:text-white hover:bg-[#2c2d30] transition-colors text-left cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-[#8a8886]" />
+                  <span>New workspace</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    openInviteModal();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#cfcecd] hover:text-white hover:bg-[#2c2d30] transition-colors text-left cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4 text-[#8a8886]" />
+                  <span>Invite to Asana</span>
+                </button>
+
+                <div className="border-t border-[#37383b] my-1" />
+
+                <Link
+                  href="/people/profile"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#cfcecd] hover:text-white hover:bg-[#2c2d30] transition-colors text-left cursor-pointer"
+                >
+                  <CircleUser className="w-4 h-4 text-[#8a8886]" />
+                  <span>Profile</span>
+                </Link>
+
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    openSettingsModal('profile');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#cfcecd] hover:text-white hover:bg-[#2c2d30] transition-colors text-left cursor-pointer"
+                >
+                  <Settings className="w-4 h-4 text-[#8a8886]" />
+                  <span>Settings</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    router.push('/login');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#cfcecd] hover:text-white hover:bg-[#2c2d30] transition-colors text-left cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-[#8a8886]" />
+                  <span>Add another account</span>
+                </button>
+
+                {/* Multiple accounts quick switch */}
+                {users && users.length > 1 && (
+                  <div className="pt-1 mt-1 border-t border-[#37383b]">
+                    <div className="text-[10px] font-semibold text-[#8a8886] uppercase px-2 mb-1">
+                      Switch Teammate
                     </div>
-                    {isActive && (
-                      <Check className="w-4 h-4 text-[#2ecc71] shrink-0" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+                    {users.map((u) => {
+                      const isSelected = u.id === currentUser.id;
+                      return (
+                        <button
+                          key={u.id}
+                          onClick={() => {
+                            switchUser(u.id);
+                            setIsMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between p-1.5 rounded-lg transition-colors text-left cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#2f3135] text-white font-medium'
+                              : 'text-[#bdbbb9] hover:bg-[#2b2c2e] hover:text-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <div
+                              className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+                              style={{ backgroundColor: u.avatarColor || '#8b5cf6' }}
+                            >
+                              {u.initials}
+                            </div>
+                            <span className="truncate text-[12px]">{u.name}</span>
+                          </div>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-[#4cd195]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-            {/* Section 1: Admin console, New workspace, Invite */}
-            <div className="border-t border-[#2e2f32] py-1 space-y-0.5">
-              <button
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  router.push('/admin');
-                }}
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
-              >
-                <SlidersHorizontal className="w-4 h-4 text-[#cfcecd]" />
-                <span>Admin console</span>
-              </button>
+                <div className="border-t border-[#37383b] my-1" />
 
-              <button
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  openCreateWorkspaceModal();
-                }}
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
-              >
-                <Plus className="w-4 h-4 text-[#cfcecd]" />
-                <span>New workspace</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  openInviteModal();
-                }}
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
-              >
-                <UserPlus className="w-4 h-4 text-[#cfcecd]" />
-                <span>Invite to Asana</span>
-              </button>
-            </div>
-
-            {/* Section 2: Profile, Settings, Add another account */}
-            <div className="border-t border-[#2e2f32] py-1 space-y-0.5">
-              <Link
-                href="/people/profile"
-                onClick={() => setIsMenuOpen(false)}
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
-              >
-                <CircleUser className="w-4 h-4 text-[#cfcecd]" />
-                <span>Profile</span>
-              </Link>
-
-              <button
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  alert('Settings: Preferences, Display, and Notifications');
-                }}
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
-              >
-                <Settings className="w-4 h-4 text-[#cfcecd]" />
-                <span>Settings</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  router.push('/login');
-                }}
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
-              >
-                <Plus className="w-4 h-4 text-[#cfcecd]" />
-                <span>Add another account</span>
-              </button>
-            </div>
-
-            {/* Section 3: Log out */}
-            <div className="border-t border-[#2e2f32] pt-1">
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-white hover:bg-[#2b2c2e] transition-colors text-left cursor-pointer"
-              >
-                <ArrowRight className="w-4 h-4 text-[#cfcecd]" />
-                <span>Log out</span>
-              </button>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#cfcecd] hover:text-white hover:bg-[#2c2d30] transition-colors text-left cursor-pointer"
+                >
+                  <ArrowRight className="w-4 h-4 text-[#8a8886]" />
+                  <span>Log out</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

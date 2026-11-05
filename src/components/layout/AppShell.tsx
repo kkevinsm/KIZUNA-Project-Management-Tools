@@ -9,6 +9,7 @@ import TaskDrawer from '../tasks/TaskDrawer';
 import CreateModal from '../modals/CreateModal';
 import InviteModal from '../modals/InviteModal';
 import CreateWorkspaceModal from '../modals/CreateWorkspaceModal';
+import SettingsModal from '../modals/SettingsModal';
 import { useApp } from '@/context/AppContext';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -97,6 +98,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <CreateModal />
       <InviteModal />
       <CreateWorkspaceModal />
+      <SettingsModal />
     </div>
   );
 }
